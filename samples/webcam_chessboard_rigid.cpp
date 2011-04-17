@@ -31,7 +31,7 @@ int options(int ac, char ** av, Options& opts) {
             "height,H", po::value<int>(&opts.height)->default_value(3),
             "The number of inside corners, height wise of chessboard.")(
             "square_size,S",
-            po::value<float>(&opts.square_size)->default_value(.01),
+            po::value<float>(&opts.square_size)->default_value(1),
             "The size of each square in meters.")("video,V", po::value<int>(
             &opts.vid)->default_value(0),
             "Video device number, find video by ls /dev/video*.");
@@ -100,9 +100,9 @@ public:
             merge(ch, 2, uv2_t); //merge the two channels back.
             uv2hat = uv2_t;
         }
-        double fval = norm(uv2 - uv2hat, cv::NORM_L2); // minimize reprojection error!
+        double fval = sqrt(norm(uv2 - uv2hat, cv::NORM_L2)); // minimize reprojection error!
         fval += 1.0e-2 * norm(w_est);                  // regularize: shrink omega!
-        fval += 1.0e-4 * norm(T_est);                  // regularize: shrink omega!
+        fval += 1.0e-2 * norm(T_est);                  // regularize: shrink omega!
         fval += exp( -CV_PI + abs(X[0]) ) + exp( -CV_PI + abs(X[1])) + exp( -CV_PI + abs(X[2]));
 
         return fval;
@@ -115,7 +115,7 @@ public:
 
     virtual OptimAlgorithm getAlgorithm() const {
         //http://ab-initio.mit.edu/wiki/index.php/NLopt_Algorithms#Nelder-Mead_Simplex
-        return NLOPT_GN_CRS2_LM;
+        return NLOPT_LN_SBPLX;
     }
 
     void setup(const std::vector<cv::Mat>& input_data) {
@@ -140,15 +140,15 @@ public:
     }
     virtual std::vector<double> ub() const
      {
-       double c[6] = {CV_PI, CV_PI, CV_PI,
-                      10e6,10e6,10e6 };
+       double c[6] = {CV_PI/2, CV_PI/2, 2*CV_PI,
+                      1e2,1e2,100 };
        return std::vector<double>(c,c+6);
      }
 
      virtual std::vector<double> lb() const
      {
-       double c[6] = {-CV_PI,-CV_PI,-CV_PI,
-                      -10e6,-10e6,-10e6 };
+       double c[6] = {-CV_PI/2,-CV_PI/2,-2*CV_PI,
+                      -1e2,-1e2,-100 };
        return std::vector<double>(c,c+6);
      }
 public:
@@ -198,8 +198,7 @@ int main(int argc, char** argv) {
 
     cout << "testing nlopt ... " << endl;
 
-    vector<Point3f> template_board = CalcChessboardCorners(board_size,
-            opts.square_size);
+    vector<Point3f> template_board = CalcChessboardCorners(board_size,1.0);
 
     cout << "K = " << K << endl;
     cout << "board_points " << template_board << endl;
@@ -272,7 +271,8 @@ int main(int argc, char** argv) {
             cv::Mat R;
             cv::Rodrigues(w,R);
             //R = R.t();
-            poseDrawer(frame,data[2],R,t);
+            
+            poseDrawer(frame,data[2],R,t * opts.square_size);
 
         }
         imshow("frame", frame);
