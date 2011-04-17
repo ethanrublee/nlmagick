@@ -11,10 +11,6 @@
 #include <opencv2/calib3d/calib3d.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 
-#include <pano_core/Camera.h>
-#include <pano_core/Blender.h>
-#include <pano_core/panoutils.h>
-
 #include <boost/program_options.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/foreach.hpp>

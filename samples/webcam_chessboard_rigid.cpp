@@ -1,18 +1,23 @@
 #include <iostream>
+#include <sstream>
+#include <fstream>
+#include <string>
+#include <fstream>
 
 #include <nlopt/nlopt.hpp>
 
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/calib3d/calib3d.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
 
-#include <pano_core/Camera.h>
-
-#include <boost/foreach.hpp>
 #include <boost/program_options.hpp>
 #include <boost/shared_ptr.hpp>
+#include <boost/foreach.hpp>
+#include <boost/filesystem.hpp>
+#include <boost/format.hpp>
+#include <boost/lexical_cast.hpp>
 
-using namespace pano;
 using namespace cv;
 using namespace std;
 using namespace nlopt;
@@ -21,6 +26,7 @@ using namespace nlopt;
 #define reverse_foreach BOOST_REVERSE_FOREACH
 
 namespace po = boost::program_options;
+using boost::lexical_cast;
 
 namespace {
 struct Options {
