@@ -31,7 +31,7 @@ int options(int ac, char ** av, Options& opts) {
             "height,H", po::value<int>(&opts.height)->default_value(3),
             "The number of inside corners, height wise of chessboard.")(
             "square_size,S",
-            po::value<float>(&opts.square_size)->default_value(1),
+            po::value<float>(&opts.square_size)->default_value(.01),
             "The size of each square in meters.")("video,V", po::value<int>(
             &opts.vid)->default_value(0),
             "Video device number, find video by ls /dev/video*.");
@@ -83,17 +83,12 @@ public:
             multiply(ch[1], 1.0 / ch[2], ch[1]); //divide by third channel
             merge(ch, 2, uv2_t); //merge the two channels back.
             uv2hat = uv2_t;
-//            std::cout << uv2hat << std::endl;
-          }
+        }
         double fval = norm(uv2 - uv2hat, cv::NORM_L2); // minimize reprojection error!
-<<<<<<< HEAD
         fval += 1.0e-2 * norm(w_est);                  // regularize: shrink omega!
         fval += 1.0e-2 * norm(T_est);                  // regularize: shrink omega!
         fval += exp( -CV_PI + abs(X[0]) ) + exp( -CV_PI + abs(X[1])) + exp( -CV_PI + abs(X[2]));
-=======
-        //fval += 1.0e-2 * norm(w_est);                  // regularize: shrink omega!
-        //fval += exp( -CV_PI + abs(X[0]) ) + exp( -CV_PI + abs(X[1])) + exp( -CV_PI + abs(X[2]));
->>>>>>> 964e128028d11671d7f80aea4a7ea2b39a44e410
+
         return fval;
     }
 
@@ -104,7 +99,7 @@ public:
 
     virtual OptimAlgorithm getAlgorithm() const {
         //http://ab-initio.mit.edu/wiki/index.php/NLopt_Algorithms#Nelder-Mead_Simplex
-        return NLOPT_LN_NELDERMEAD;
+        return NLOPT_LN_SBPLX;
     }
 
     void setup(const std::vector<cv::Mat>& input_data) {
