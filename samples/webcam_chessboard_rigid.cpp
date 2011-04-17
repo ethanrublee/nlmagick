@@ -83,12 +83,17 @@ public:
             multiply(ch[1], 1.0 / ch[2], ch[1]); //divide by third channel
             merge(ch, 2, uv2_t); //merge the two channels back.
             uv2hat = uv2_t;
-        }
-
+//            std::cout << uv2hat << std::endl;
+          }
         double fval = norm(uv2 - uv2hat, cv::NORM_L2); // minimize reprojection error!
+<<<<<<< HEAD
         fval += 1.0e-2 * norm(w_est);                  // regularize: shrink omega!
         fval += 1.0e-2 * norm(T_est);                  // regularize: shrink omega!
         fval += exp( -CV_PI + abs(X[0]) ) + exp( -CV_PI + abs(X[1])) + exp( -CV_PI + abs(X[2]));
+=======
+        //fval += 1.0e-2 * norm(w_est);                  // regularize: shrink omega!
+        //fval += exp( -CV_PI + abs(X[0]) ) + exp( -CV_PI + abs(X[1])) + exp( -CV_PI + abs(X[2]));
+>>>>>>> 964e128028d11671d7f80aea4a7ea2b39a44e410
         return fval;
     }
 
@@ -134,7 +139,7 @@ vector<Point3f> CalcChessboardCorners(cv::Size chess_size, float square_size) {
     for (int i = 0; i < chess_size.height; i++)
         for (int j = 0; j < chess_size.width; j++)
             corners.push_back(Point3f(float(j * square_size), float(i
-                    * square_size), 1));
+                    * square_size), 0));
     return corners;
 }
 
@@ -214,8 +219,8 @@ int main(int argc, char** argv) {
         bool found = findChessboardCorners(frame, board_size, observation,
                 CALIB_CB_ADAPTIVE_THRESH + CALIB_CB_FAST_CHECK
                         + CALIB_CB_NORMALIZE_IMAGE + CALIB_CB_FILTER_QUADS);
-        // draw previous one or something until fork returns        
-        
+        // draw previous one or something until fork returns
+
         drawChessboardCorners(frame, board_size, observation, found);
         if (found) {
             Mat uv2(Mat(observation).t());
@@ -237,6 +242,13 @@ int main(int argc, char** argv) {
             cout << "result code: " << opt_core.getResult() << endl;
             cout << " [w,T] optimal = " << Mat(optimal_W_and_T) << endl;
             cout << " error = " << fval_final << endl;
+            cv::Mat w =  Mat(optimal_W_and_T).rowRange(0,3);
+            cv::Mat t = Mat(optimal_W_and_T).rowRange(3,6);
+            cv::Mat R;
+            cv::Rodrigues(w,R);
+            //R = R.t();
+            poseDrawer(frame,data[2],R,t);
+
         }
         imshow("frame", frame);
         char key = cv::waitKey(10);
