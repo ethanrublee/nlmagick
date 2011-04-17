@@ -83,10 +83,10 @@ public:
             multiply(ch[1], 1.0 / ch[2], ch[1]); //divide by third channel
             merge(ch, 2, uv2_t); //merge the two channels back.
             uv2hat = uv2_t;
-//            std::cout << uv2hat << std::endl;
-          }
+        }
         double fval = norm(uv2 - uv2hat, cv::NORM_L2); // minimize reprojection error!
         //fval += 1.0e-2 * norm(w_est);                  // regularize: shrink omega!
+        //fval += 1.0e-2 * norm(T_est);                  // regularize: shrink omega!
         //fval += exp( -CV_PI + abs(X[0]) ) + exp( -CV_PI + abs(X[1])) + exp( -CV_PI + abs(X[2]));
         return fval;
     }
