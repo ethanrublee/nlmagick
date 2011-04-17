@@ -3,4 +3,11 @@ find_package( OpenCV )
 if(OpenCV_FOUND)
 add_executable(template_nlopt_rigid  template_nlopt_rigid.cpp  )
 target_link_libraries(template_nlopt_rigid  nlopt ${Boost_LIBRARIES} ${OpenCV_LIBS})
+
+add_executable(template_image_rigid  template_image_rigid.cpp  )
+target_link_libraries(template_image_rigid  nlopt ${Boost_LIBRARIES} ${OpenCV_LIBS})
+
+add_executable(webcam_chessboard_rigid  webcam_chessboard_rigid.cpp  )
+target_link_libraries(webcam_chessboard_rigid  nlopt ${Boost_LIBRARIES} ${OpenCV_LIBS})
+
 endif()
