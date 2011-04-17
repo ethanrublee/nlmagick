@@ -87,6 +87,7 @@ public:
 
         double fval = norm(uv2 - uv2hat, cv::NORM_L2); // minimize reprojection error!
         fval += 1.0e-2 * norm(w_est);                  // regularize: shrink omega!
+        fval += 1.0e-2 * norm(T_est);                  // regularize: shrink omega!
         fval += exp( -CV_PI + abs(X[0]) ) + exp( -CV_PI + abs(X[1])) + exp( -CV_PI + abs(X[2]));
         return fval;
     }
