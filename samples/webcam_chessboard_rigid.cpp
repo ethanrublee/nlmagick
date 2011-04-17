@@ -115,7 +115,7 @@ public:
 
     virtual OptimAlgorithm getAlgorithm() const {
         //http://ab-initio.mit.edu/wiki/index.php/NLopt_Algorithms#Nelder-Mead_Simplex
-        return NLOPT_LN_SBPLX;
+        return NLOPT_GN_CRS2_LM;
     }
 
     void setup(const std::vector<cv::Mat>& input_data) {
