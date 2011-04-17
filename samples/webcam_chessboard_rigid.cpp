@@ -127,6 +127,16 @@ public:
 
         T_est = cv::Mat::zeros(3, 1, CV_64F);
         w_est = cv::Mat::zeros(3, 1, CV_64F);
+        w_est.at<double>(2) = -CV_PI;
+    }
+    virtual std::vector<double> Xinit() const
+    {
+      std::vector<double> x0 = std::vector<double>(N(), 0.0);
+      for( int k = 0; k < (int) N(); k++ ) {
+        x0[k] = 0.0;
+      }
+      x0[2] = -CV_PI;
+      return x0;
     }
 
 public:
