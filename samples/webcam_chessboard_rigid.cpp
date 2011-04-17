@@ -62,6 +62,22 @@ public:
     }
     virtual ~RigidTransformFitter() {
     }
+    
+    /** Should return a filled out struct of stopping criteria.
+     */
+    virtual OptimStopCriteria getStopCriteria() const {
+        OptimStopCriteria stop_criteria;
+        stop_criteria.ftol_abs = 1e-8;
+        stop_criteria.ftol_rel = 1e-8;
+        stop_criteria.xtol_rel = 1e-8;
+        stop_criteria.nevals   = 0;
+        stop_criteria.maxeval  = 50000;
+        stop_criteria.maxtime  = 10;
+        stop_criteria.start    = 0.0;
+        stop_criteria.force_stop = 0;
+        stop_criteria.minf_max   = 1e9;
+        return stop_criteria;
+    }
 
     double evalCostFunction(const double* X, double*) {
 
