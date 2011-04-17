@@ -45,10 +45,5 @@ endmacro()
 
 define_module(nlopt)
 
-find_package( OpenCV )
-if(OpenCV_FOUND)
-add_executable(template_nlopt_rigid  test/template_nlopt_rigid.cpp  )
-target_link_libraries(template_nlopt_rigid  nlopt ${Boost_LIBRARIES} ${OpenCV_LIBS})
-add_executable(template_homography  test/template_homography.cpp  )
-target_link_libraries(template_homography  nlopt ${Boost_LIBRARIES} ${OpenCV_LIBS})
-endif()
+add_subdirectory(samples)
+
