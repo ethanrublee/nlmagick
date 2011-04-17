@@ -1,22 +1,8 @@
-#include <iostream>
-#include <sstream>
-#include <fstream>
-#include <string>
-#include <fstream>
 
+#include "opencv_helpers.hpp"
 #include <nlopt/nlopt.hpp>
 
-#include <opencv2/core/core.hpp>
-#include <opencv2/highgui/highgui.hpp>
-#include <opencv2/calib3d/calib3d.hpp>
-#include <opencv2/imgproc/imgproc.hpp>
 
-#include <boost/program_options.hpp>
-#include <boost/shared_ptr.hpp>
-#include <boost/foreach.hpp>
-#include <boost/filesystem.hpp>
-#include <boost/format.hpp>
-#include <boost/lexical_cast.hpp>
 
 using namespace cv;
 using namespace std;
@@ -31,34 +17,7 @@ using boost::lexical_cast;
 
 namespace {
 
-bool readKfromCalib(cv::Mat& K, cv::Mat& distortion, cv::Size & img_size, const std::string& calibfile)
-{
-  cv::FileStorage fs(calibfile, cv::FileStorage::READ);
-  cv::Mat cameramat;
-  cv::Mat cameradistortion;
-  float width = 0, height = 0;
-  if (fs.isOpened())
-  {
-    cv::read(fs["camera_matrix"], cameramat, cv::Mat());
-    cv::read(fs["distortion_coefficients"], cameradistortion, cv::Mat());
-    cv::read(fs["image_width"], width, 0);
-    cv::read(fs["image_height"], height, 0);
 
-    fs.release();
-
-  }
-  else
-  {
-    throw std::runtime_error("bad calibration!");
-  }
-
-  cv::Size _size(width, height);
-  img_size = _size;
-
-  cameramat.convertTo(K,CV_32F);
-  distortion = cameradistortion;
-  return true;
-}
 
 struct Options {
     string k_file;
@@ -88,13 +47,13 @@ int options(int ac, char ** av, Options& opts) {
             "output for warped image. default: warped.jpg")(
             "initguess,g", po::value<string>(&opts.guess_initial)->default_value("x"),
             "initial guess csv file for params. default: none, all 0's")(
-            "finalxval,f", po::value<string>(&opts.x_out_final)->default_value("wt_final.out"),
+            "finalxval,f", po::value<string>(&opts.x_out_final)->default_value("pose_final_out.csv"),
             "final output file csv for w,T solved values.")(
             "maskimage,m", po::value<string>(&opts.mask_img),
             "mask: non-zero ROI in template. Required / might use entire image otherwise. ")(
             "video,V", po::value<int>(&opts.vid)->default_value(0),
             "Video device number, find video by ls /dev/video*.")(
-            "maxTime,T", po::value<int>(&opts.maxSolverTime)->default_value(240),
+            "maxTime,T", po::value<int>(&opts.maxSolverTime)->default_value(340),
             "max solver run time in seconds.")(
             "verbose,v", po::value<int>(&opts.verbosity)->default_value(2),
             "verbosity, how much to display crap. between 0 and ~3.");
@@ -129,9 +88,9 @@ public:
      */
     virtual OptimStopCriteria getStopCriteria() const {
         OptimStopCriteria stop_criteria;
-        stop_criteria.ftol_abs = 1e-6;
-        stop_criteria.ftol_rel = 1e-6;
-        stop_criteria.xtol_rel = 1e-6;
+        stop_criteria.ftol_abs = 1e-8;
+        stop_criteria.ftol_rel = 1e-8;
+        stop_criteria.xtol_rel = 1e-8;
         stop_criteria.nevals   = 0;
         stop_criteria.maxeval  = 50000;
         stop_criteria.maxtime  = maxSolverTime;
@@ -145,7 +104,7 @@ public:
     {
        cout << "w_est = " << w_est << endl;
        cout << "T_est = " << T_est << endl;
-       cout <<"H_est = \n"<< H_est << endl;
+//       cout <<"H_est = \n"<< H_est << endl;
 
        if( verbosity >= 2 ) {
          w_ch[2] = i_ch[2] + warped_mask_border;
@@ -193,25 +152,20 @@ public:
         cv::Scalar mean_rgb_in  = cv::mean(input_img,warped_mask);
         cv::bitwise_not(warped_mask.clone(),warped_mask);
         cv::Scalar mean_rgb_out = cv::mean(input_img,warped_mask);
-
-        double lambda = 1e-1;
-        if( iters > 200 ) {
-          lambda = 1;
-        }
-
+     
         for(int i = 0; i < (int) w_ch.size();i++)
         {
-          double fval_i =  1.0 / ( (pow( (mean_rgb_in[i] - mean_rgb_out[i]), 2.0 )) + 1e-3 );
+          double fval_i =  1.0 / ( (pow( (mean_rgb_in[i] - mean_rgb_out[i]),2.0 )) + 1e-3 );
           fval_i       *=  (1+1e-1*(norm(w_ch[i],i_ch[i], cv::NORM_L2,warped_mask))/nnz_projected );
           fval         +=fval_i;
         }
-        fval += 1e-3 * norm( w_est_float ); // regularize: shrink omega!
-        fval += 1e-3 * norm( T_est ); // regularize: shrink T!
+        fval += 1e-5 * norm( w_est_float ); // regularize: shrink omega!
+        fval += 1e-5 * norm( T_est ); // regularize: shrink T!
 
         // slightly ghetto: prevent projection of entire template off-screen
         double pA = abs( 1.0/(nnz_projected / (nnz_mask_init + 1e-8) ) );
         double pB = abs( (nnz_projected / (nnz_mask_init + 1e-8) ) );
-        fval     += 1e-1*(pA + pB);
+        fval     += 5 + (pA + pB );
 
         iters++;
         if( iters < 50 ) // prevent big jumps early on (?)
@@ -246,14 +200,14 @@ public:
      virtual std::vector<double> ub() const
       {
         double c[6] = {CV_PI / 2, CV_PI / 2, CV_PI/2,
-                       1.0,1.0,5.0  };
+                       1.0/8,1.0/8,5.0  };
         return std::vector<double>(c,c+6);
       }
 
       virtual std::vector<double> lb() const
       {
         double c[6] = {-CV_PI / 2, -CV_PI / 2, -CV_PI/2,
-                        -1.0,-1.0,-0.7 };
+                        -1.0/8,-1.0/8,-0.7 };
         return std::vector<double>(c,c+6);
       }
 
@@ -311,8 +265,9 @@ public:
         mask_img     = data[3].clone();
 
         { // setup image-proc operations
-          cv::GaussianBlur( input_img.clone(), input_img, Size(7,7),5.0,5.0 );
-          cv::GaussianBlur( template_img.clone(), template_img, Size(7,7),5.0,5.0 );
+          cv::GaussianBlur( input_img.clone(), input_img, Size(15,15),5.0,5.0 );
+          cv::GaussianBlur( template_img.clone(), template_img, Size(15,15),5.0,5.0 );
+         // cv::GaussianBlur( mask_img.clone(), mask_img, Size(15,15),5.0,5.0 );
           cv::bitwise_and(template_img, mask_img, template_img);
           cv::cvtColor( mask_img.clone(), mask_img, CV_RGB2GRAY );
           mask_img.clone().convertTo(mask_img,CV_8U);
@@ -333,6 +288,9 @@ public:
         Mat mask_img_not = mask_img.clone();
         cv::bitwise_not(mask_img,mask_img_not);
         cv::Scalar mean_rgb_out = cv::mean(template_img,mask_img_not);
+        template_mean_rgb_in  = cv::mean(template_img,mask_img);
+        cv::bitwise_not(mask_img,mask_img_not );
+        template_mean_rgb_out = cv::mean(template_img,mask_img_not);
 
         cv::Canny( mask_img, mask_border, 0, 1 ); // create border mask for display
 
@@ -426,6 +384,8 @@ public:
     Mat warped_template; // warp template to match input
     Mat warped_mask_border;
     Mat warped_mask;
+    Scalar template_mean_rgb_out;
+    Scalar template_mean_rgb_in;
     double nnz_mask_init;
     double maxSolverTime;
     double template_mean_cost;

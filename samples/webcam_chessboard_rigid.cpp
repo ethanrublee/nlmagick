@@ -1,22 +1,5 @@
-#include <iostream>
-#include <sstream>
-#include <fstream>
-#include <string>
-#include <fstream>
-
 #include <nlopt/nlopt.hpp>
-
-#include <opencv2/core/core.hpp>
-#include <opencv2/highgui/highgui.hpp>
-#include <opencv2/calib3d/calib3d.hpp>
-#include <opencv2/imgproc/imgproc.hpp>
-
-#include <boost/program_options.hpp>
-#include <boost/shared_ptr.hpp>
-#include <boost/foreach.hpp>
-#include <boost/filesystem.hpp>
-#include <boost/format.hpp>
-#include <boost/lexical_cast.hpp>
+#include "opencv_helpers.hpp"
 
 using namespace cv;
 using namespace std;
@@ -43,14 +26,14 @@ int options(int ac, char ** av, Options& opts) {
             "intrinsics,K",
             po::value<string>(&opts.k_file),
             "The camera intrinsics file, should be yaml and have atleast \"K:...\". Required.")(
-            "width,W", po::value<int>(&opts.width)->default_value(8),
+            "width,W", po::value<int>(&opts.width)->default_value(4),
             "The number of inside corners, width wise of chessboard.")(
-            "height,H", po::value<int>(&opts.height)->default_value(6),
+            "height,H", po::value<int>(&opts.height)->default_value(3),
             "The number of inside corners, height wise of chessboard.")(
             "square_size,S",
             po::value<float>(&opts.square_size)->default_value(1),
             "The size of each square in meters.")("video,V", po::value<int>(
-            &opts.vid)->default_value(-1),
+            &opts.vid)->default_value(0),
             "Video device number, find video by ls /dev/video*.");
 
     po::variables_map vm;
@@ -169,7 +152,9 @@ int main(int argc, char** argv) {
     if (options(argc, argv, opts))
         return 1;
 
-    Camera camera(opts.k_file);
+    Mat D,K;
+    Size Sz;
+    readKfromCalib(K, D, Sz, opts.k_file);
     Size board_size(opts.width, opts.height);
 
     cout << "testing nlopt ... " << endl;
@@ -177,11 +162,11 @@ int main(int argc, char** argv) {
     vector<Point3f> template_board = CalcChessboardCorners(board_size,
             opts.square_size);
 
-    cout << "K = " << camera.K() << endl;
+    cout << "K = " << K << endl;
     cout << "board_points " << template_board << endl;
     vector<Point2f> imgpts;
     projectPoints(Mat(template_board), Mat::zeros(3, 1, CV_32F), Mat::zeros(3,
-            1, CV_32F), camera.K(), Mat(), imgpts);
+            1, CV_32F), K, Mat(), imgpts);
     cout << "image points " << imgpts << endl;
     Mat xyz1(template_board);
     xyz1 = xyz1.t();
@@ -195,7 +180,7 @@ int main(int argc, char** argv) {
     vector<Mat> data(3);
     xyz1.convertTo(data[0], CV_64F); //ideal 3d points
     uv1.convertTo(data[1], CV_64F); // init with the  projected version of the chessboard
-    camera.K().convertTo(data[2], CV_64F);
+    K.convertTo(data[2], CV_64F);
 
     // lock and load
     rigid_test_problem->setup(data);
