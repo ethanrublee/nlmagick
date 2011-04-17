@@ -62,7 +62,7 @@ public:
     }
     virtual ~RigidTransformFitter() {
     }
-    
+
     /** Should return a filled out struct of stopping criteria.
      */
     virtual OptimStopCriteria getStopCriteria() const {
@@ -102,7 +102,7 @@ public:
         }
         double fval = norm(uv2 - uv2hat, cv::NORM_L2); // minimize reprojection error!
         fval += 1.0e-2 * norm(w_est);                  // regularize: shrink omega!
-        fval += 1.0e-2 * norm(T_est);                  // regularize: shrink omega!
+        fval += 1.0e-4 * norm(T_est);                  // regularize: shrink omega!
         fval += exp( -CV_PI + abs(X[0]) ) + exp( -CV_PI + abs(X[1])) + exp( -CV_PI + abs(X[2]));
 
         return fval;
@@ -138,7 +138,19 @@ public:
       x0[2] = -CV_PI;
       return x0;
     }
+    virtual std::vector<double> ub() const
+     {
+       double c[6] = {CV_PI, CV_PI, CV_PI,
+                      10e6,10e6,10e6 };
+       return std::vector<double>(c,c+6);
+     }
 
+     virtual std::vector<double> lb() const
+     {
+       double c[6] = {-CV_PI,-CV_PI,-CV_PI,
+                      -10e6,-10e6,-10e6 };
+       return std::vector<double>(c,c+6);
+     }
 public:
     // some internal persistent data
     cv::Mat K; //camera matrix
@@ -246,16 +258,8 @@ int main(int argc, char** argv) {
         if (found) {
             Mat uv2(Mat(observation).t());
             uv2.convertTo(rigid_test_problem->uv2, CV_64F);
+            opt_core.optimize();
 
-            opt_core.optimize(&(optimal_W_and_T[0]));
-            for( int k = 0; k < 3; k++ ) {
-              while( optimal_W_and_T[k] < -CV_PI ) {
-                optimal_W_and_T[k] += 2*CV_PI;
-              }
-              while( optimal_W_and_T[k] > CV_PI ) {
-                optimal_W_and_T[k] -= 2*CV_PI;
-              }
-            }
 
             optimal_W_and_T = opt_core.getOptimalVector();
             fval_final = opt_core.getFunctionValue();
