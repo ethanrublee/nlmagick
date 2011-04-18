@@ -17,8 +17,6 @@ using boost::lexical_cast;
 
 namespace {
 
-
-
 struct Options {
     string k_file;
     string input_img; // what we're solving on. no mask here.
@@ -27,6 +25,7 @@ struct Options {
     string out_warp_img;
     string guess_initial; // a 'csv' file with omega_hat and T initial guesses
     string x_out_final;   // a 'csv' file with omega_hat and T final solved values
+    string algorithm;
     int maxSolverTime; // seconds
     int vid;        // /dev/videoN
     int verbosity;  // how much crap to display
@@ -47,13 +46,15 @@ int options(int ac, char ** av, Options& opts) {
             "output for warped image. default: warped.jpg")(
             "initguess,g", po::value<string>(&opts.guess_initial)->default_value("x"),
             "initial guess csv file for params. default: none, all 0's")(
-            "finalxval,f", po::value<string>(&opts.x_out_final)->default_value("pose_final_out.csv"),
+            "finalxval,f", po::value<string>(&opts.x_out_final)->default_value("wt_final.out"),
             "final output file csv for w,T solved values.")(
             "maskimage,m", po::value<string>(&opts.mask_img),
             "mask: non-zero ROI in template. Required / might use entire image otherwise. ")(
             "video,V", po::value<int>(&opts.vid)->default_value(0),
             "Video device number, find video by ls /dev/video*.")(
-            "maxTime,T", po::value<int>(&opts.maxSolverTime)->default_value(340),
+            "algorithm,a", po::value<string>(&opts.algorithm)->default_value("NLOPT_LN_SBPLX"),
+            "algorithm for solver, such as NLOPT_LN_BOBYQA, NLOPT_LN_SBPLX, NLOPT_LN_COBYLA.")(
+            "maxTime,T", po::value<int>(&opts.maxSolverTime)->default_value(240),
             "max solver run time in seconds.")(
             "verbose,v", po::value<int>(&opts.verbosity)->default_value(2),
             "verbosity, how much to display crap. between 0 and ~3.");
@@ -75,7 +76,7 @@ int options(int ac, char ** av, Options& opts) {
     return 0;
 
 }
-
+  
 }
 
 class RigidTransformFitter: public OptimProblem {
@@ -130,72 +131,54 @@ public:
       outimg.convertTo(outimg,CV_8UC3);
       imwrite( warpname, outimg );
     }
-
+    double evalCostFuncBasic( ) {
+      double fval = 0.0;
+      double nnz_projected = (cv::sum(warped_mask)[0] + 1e-2) * (1 / 255.0);      
+      static Mat warped_mask_not;
+      cv::Scalar mean_rgb_in  = cv::mean(input_img,warped_mask);
+      cv::bitwise_not(warped_mask,warped_mask_not);
+      cv::Scalar mean_rgb_out = cv::mean(input_img,warped_mask_not);
+      
+      for(int i = 0; i < (int) w_ch.size();i++)
+      {          
+        double fval_i       =  (norm(w_ch[i],i_ch[i], cv::NORM_L2,warped_mask))/nnz_projected;
+        fval_i             +=  -abs( mean_rgb_in[i] - mean_rgb_out[i] ) * (1.0/255.0);
+        fval               +=  fval_i;
+      }
+      fval += ( 1e-2 * norm( w_est,NORM_INF) + 1e-6*norm(T_est,NORM_INF) ); // regularize
+    
+      return fval;
+    }
 
 
     double evalCostFunction(const double* X, double*) {
 
-        memcpy(w_est.data, X, 3 * sizeof(double));
-        memcpy(T_est.data, X + 3, 3 * sizeof(double));
+      iters++;
+      
+      memcpy(w_est.data, X, 3 * sizeof(double));
+      memcpy(T_est.data, X + 3, 3 * sizeof(double));
 
-        Mat w_est_float;
-        w_est.convertTo(w_est_float,CV_32F);
-        Rodrigues(w_est_float, R_est); //get a rotation matrix
-
-        applyPerspectiveWarp();
-
-        double fval = 0.0;
-        double nnz_projected = cv::sum(warped_mask)[0];
-
-        // double wsum = 1.0/(1.0 + nnz_projected ); // non-zero area
-
-        cv::Scalar mean_rgb_in  = cv::mean(input_img,warped_mask);
-        cv::bitwise_not(warped_mask.clone(),warped_mask);
-        cv::Scalar mean_rgb_out = cv::mean(input_img,warped_mask);
+      Mat w_est_float;
+      w_est.convertTo(w_est_float,CV_32F);
+      Rodrigues(w_est_float, R_est); //get a rotation matrix
      
-        for(int i = 0; i < (int) w_ch.size();i++)
-        {
-          double fval_i =  1.0 / ( (pow( (mean_rgb_in[i] - mean_rgb_out[i]),2.0 )) + 1e-3 );
-          fval_i       *=  (1+1e-1*(norm(w_ch[i],i_ch[i], cv::NORM_L2,warped_mask))/nnz_projected );
-          fval         +=fval_i;
-        }
-        fval += 1e-5 * norm( w_est_float ); // regularize: shrink omega!
-        fval += 1e-5 * norm( T_est ); // regularize: shrink T!
-
-        // slightly ghetto: prevent projection of entire template off-screen
-        double pA = abs( 1.0/(nnz_projected / (nnz_mask_init + 1e-8) ) );
-        double pB = abs( (nnz_projected / (nnz_mask_init + 1e-8) ) );
-        fval     += 5 + (pA + pB );
-
-        iters++;
-        if( iters < 50 ) // prevent big jumps early on (?)
-        {                 // whoa, more ghetto, time-depenendent cost!
-          if( verbosity > 1 ) {
-            cout << "iters ... " << iters << endl;
+      applyPerspectiveWarp();
+      double fval = evalCostFuncBasic();
+     
+      if( fval < fval_best ) { 
+        if( verbosity >= 1 ) {
+          if( verbosity >= 2 ) {
+            displayCallback(5);
           }
-          fval += ( exp( -CV_PI/2 + abs(X[0] + xg_input[0]) ) +
-                    exp( -CV_PI/2 + abs(X[1] + xg_input[1]) ) +
-                    exp( -CV_PI/2 + abs(X[2] + xg_input[2])) );
-          fval += ( exp( -1 + abs(X[3] + xg_input[3]) ) +
-                    exp( -1 + abs(X[4] + xg_input[4]) ) +
-                    exp( -1 + abs(X[5] + xg_input[5]) ) );
-        }
-        if( fval < fval_best ) {
-
-          if( verbosity >= 1 ) {
-            if( verbosity >= 2 ) {
-              cout << "nnz projected/init: " << pA+pB << endl;
-              displayCallback(5);
-            }
-            if( rand() % 3 == 1 ) {
-              cout << "fval: " << fval << ", iters: " << iters
-                   << ", f-step: " << abs(fval-fval_best) << endl;
-            }
+          if( rand() % 3 == 1 ) {
+            cout << "fval: " << fval << ", iters: " << iters
+                 << ", f-step: " << abs(fval-fval_best) << endl;
           }
-          fval_best = fval;
         }
-
-        return fval;
+        fval_best = fval;
+      }
+      
+      return fval;
     }
      virtual std::vector<double> ub() const
       {
@@ -207,7 +190,7 @@ public:
       virtual std::vector<double> lb() const
       {
         double c[6] = {-CV_PI / 2, -CV_PI / 2, -CV_PI/2,
-                        -1.0/8,-1.0/8,-0.7 };
+                        -1.0/8,-1.0/8,-0.4 };
         return std::vector<double>(c,c+6);
       }
 
@@ -250,12 +233,19 @@ public:
         return 6; //6 free params, 3 for R 3 for T, 1 "f"
     }
 
-
     virtual OptimAlgorithm getAlgorithm() const {
-        //http://ab-initio.mit.edu/wiki/index.php/NLopt_Algorithms#Nelder-Mead_Simplex
+        //http://ab-initio.mit.edu/wiki/index.php/NLopt_Algorithms
+      if( algorithm.compare("NLOPT_LN_SBPLX") == 0 )
+        return NLOPT_LN_SBPLX;
+      if( algorithm.compare("NLOPT_LN_COBYLA") == 0 ) {
+        return NLOPT_LN_COBYLA;
+      }
+      if( algorithm.compare("NLOPT_LN_BOBYQA") == 0 ) {
+        return NLOPT_LN_BOBYQA;
+      }
+      cout << "warning, algorithm string is bogus. using default..." << endl;
       return  NLOPT_LN_SBPLX;
     }
-
     void setup(const vector<Mat>& data) {
 
         // what we're allowed to see: image points and calibration K matrix
@@ -292,7 +282,8 @@ public:
         cv::bitwise_not(mask_img,mask_img_not );
         template_mean_rgb_out = cv::mean(template_img,mask_img_not);
 
-        cv::Canny( mask_img, mask_border, 0, 1 ); // create border mask for display
+        // create border mask for display
+        cv::Canny( mask_img, mask_border, 0, 1 ); 
 
         cout << "verbosity level is: " << verbosity << endl;
         if( verbosity > 2 ) {
@@ -359,15 +350,16 @@ public:
       }
 
 
-      xg_input = vector<float>(6,0); xg_input[5] = 0.5;
+      xg_input = vector<float>(6,0); xg_input[5] = 0.0;
       if( opts.guess_initial.size() >= 3 ) {
         load_RT_from_csv( opts.guess_initial, xg_input );
       }
       cout << "x0 = " << endl << Mat(xg_input) << endl;
 
-      this->verbosity = opts.verbosity;
+      verbosity     = opts.verbosity;
+      algorithm     = opts.algorithm;
       maxSolverTime = (double) opts.maxSolverTime;
-
+      cout << "using solver: " << algorithm << endl;
       setup(data);
     }
 
@@ -393,7 +385,8 @@ public:
     vector<float> xf_output; //-f
     vector<Mat> i_ch; // input-image channels
     vector<Mat> w_ch; // warped-template channels
-
+    string algorithm; // what solver to use 
+    
     // solving for these
     Mat T_est;
     Mat w_est;
