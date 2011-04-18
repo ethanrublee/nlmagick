@@ -113,6 +113,10 @@ public:
          i_ch[1].copyTo(w_ch[1]);
          merge(w_ch,warped_template);
        }
+       
+       // Argh, backwards! Need to go the other direction to draw it
+       // poseDrawer(warped_template, K, w_est_float, T_est_float * 0.001);
+       
        imshow("warped_template",warped_template);
        if( verbosity > 2 ) {
           imshow("warped_mask",warped_mask);
@@ -129,6 +133,8 @@ public:
       merge(w_ch,warped_template);
       Mat outimg = warped_template.clone();
       outimg.convertTo(outimg,CV_8UC3);
+      // Argh, backwards! Need to go the other direction to draw it
+      //poseDrawer(outimg, K, w_est_float, T_est_float);
       imwrite( warpname, outimg );
     }
     double evalCostFuncBasic( ) {
@@ -154,11 +160,9 @@ public:
     double evalCostFunction(const double* X, double*) {
 
       iters++;
-      
       memcpy(w_est.data, X, 3 * sizeof(double));
       memcpy(T_est.data, X + 3, 3 * sizeof(double));
-
-      Mat w_est_float;
+      T_est.convertTo(T_est_float,CV_32F);
       w_est.convertTo(w_est_float,CV_32F);
       Rodrigues(w_est_float, R_est); //get a rotation matrix
      
@@ -390,6 +394,8 @@ public:
     // solving for these
     Mat T_est;
     Mat w_est;
+    Mat w_est_float;
+    Mat T_est_float;
     Mat R_est;
     Mat H_est;
 
