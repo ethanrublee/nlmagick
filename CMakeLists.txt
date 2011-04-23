@@ -3,18 +3,16 @@ project(nlmagick)
 # search for Boost version 1.34
 find_package( Boost COMPONENTS filesystem program_options )
 
-
 link_directories ( ${Boost_LIBRARY_DIRS} )
 include_directories ( ${Boost_INCLUDE_DIRS} )
-
 
 #set flags so that we have awesome compile time errors on all warnings
 #notice the -Wl,--no-undefined helps with making sure all symbols are found during
 #link time.
-set(CMAKE_C_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wl,--no-undefined")
+set(CMAKE_C_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wl,--no-undefined -fopenmp")
 
 #
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall  -Werror -Wl,--no-undefined")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall  -Werror -Wl,--no-undefined -fopenmp")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -DBOOST_DISABLE_ASSERTS")
 
 #set the default path for built executables to the "bin" directory

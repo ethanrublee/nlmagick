@@ -46,7 +46,8 @@ inline bool readKfromCalib(cv::Mat& K, cv::Mat& distortion, cv::Size & img_size,
   return true;
 }
 
-inline void poseDrawer(cv::Mat& drawImage, const cv::Mat& K, const cv::Mat& w, const cv::Mat& t)
+inline void poseDrawer(cv::Mat& drawImage, const cv::Mat& K, 
+                       const cv::Mat& w, const cv::Mat& t, const std::string scaleText = std::string(""))
 {
   using namespace cv;
   Point3f z(0, 0, 0.25);
@@ -58,22 +59,26 @@ inline void poseDrawer(cv::Mat& drawImage, const cv::Mat& K, const cv::Mat& w, c
   vector<Point2f> ip;
 
   projectPoints(Mat(op), w, t, K, Mat(), ip);
-
+  double axes_sz = 120.0;
+  ip[1] = ip[0] + (ip[1]-ip[0] ) * ( axes_sz / norm( ip[1] - ip[0] ) );
+  ip[2] = ip[0] + (ip[2]-ip[0] ) * ( axes_sz / norm( ip[2] - ip[0] ) );
+  ip[3] = ip[0] + (-ip[3]+ip[0]) * ( axes_sz / norm( ip[3] - ip[0] ) );
+  
   vector<Scalar> c(4); //colors
   c[0] = Scalar(255, 255, 255);
-  c[1] = Scalar(255, 0, 0);//x
-  c[2] = Scalar(0, 255, 0);//y
-  c[3] = Scalar(0, 0, 255);//z
-  line(drawImage, ip[0], ip[1], c[1]);
-  line(drawImage, ip[0], ip[2], c[2]);
-  line(drawImage, ip[0], ip[3], c[3]);
-  string scaleText = "scale 0.25 meters";
+  c[1] = Scalar(255, 0, 100);//x
+  c[2] = Scalar(100, 100, 0);//y
+  c[3] = Scalar(50, 100, 255);//z
+  line(drawImage, ip[0], ip[1], c[1],3,CV_AA);
+  line(drawImage, ip[0], ip[2], c[2],3,CV_AA);
+  line(drawImage, ip[0], ip[3], c[3],3,CV_AA);
+ 
   int baseline = 0;
   Size sz = getTextSize(scaleText, CV_FONT_HERSHEY_SIMPLEX, 1, 1, &baseline);
   rectangle(drawImage, Point(10, 30 + 5), Point(10, 30) + Point(sz.width, -sz.height - 5), Scalar::all(0), -1);
-  putText(drawImage, scaleText, Point(10, 30), CV_FONT_HERSHEY_SIMPLEX, 1.0, c[0], 1, CV_AA, false);
-  putText(drawImage, "Z", ip[3], CV_FONT_HERSHEY_SIMPLEX, 1.0, c[3], 1, CV_AA, false);
-  putText(drawImage, "Y", ip[2], CV_FONT_HERSHEY_SIMPLEX, 1.0, c[2], 1, CV_AA, false);
-  putText(drawImage, "X", ip[1], CV_FONT_HERSHEY_SIMPLEX, 1.0, c[1], 1, CV_AA, false);
+  putText(drawImage, scaleText, Point(10, 30), CV_FONT_HERSHEY_SIMPLEX, 1.0, c[0], 3, CV_AA, false);
+  putText(drawImage, "Z", ip[3], CV_FONT_HERSHEY_SIMPLEX, 1.0, c[3], 3, CV_AA, false);
+  putText(drawImage, "Y", ip[2], CV_FONT_HERSHEY_SIMPLEX, 1.0, c[2], 3, CV_AA, false);
+  putText(drawImage, "X", ip[1], CV_FONT_HERSHEY_SIMPLEX, 1.0, c[1], 3, CV_AA, false);
 
 }

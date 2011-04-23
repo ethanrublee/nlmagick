@@ -1,7 +1,7 @@
 
 #include "opencv_helpers.hpp"
 #include <nlopt/nlopt.hpp>
-
+#include <omp.h>
 
 
 using namespace cv;
@@ -103,10 +103,7 @@ public:
 
     void   displayCallback(int twait = 0)
     {
-       cout << "w_est = " << w_est << endl;
-       cout << "T_est = " << T_est << endl;
-//       cout <<"H_est = \n"<< H_est << endl;
-
+       cout << "w_est = " << w_est << ", " << "T_est = " << T_est << endl;
        if( verbosity >= 2 ) {
          w_ch[2] = i_ch[2] + warped_mask_border;
          w_ch[0] = w_ch[0]*0.5 + i_ch[0]*0.5;
@@ -114,8 +111,8 @@ public:
          merge(w_ch,warped_template);
        }
        
-       // Argh, backwards! Need to go the other direction to draw it
-       // poseDrawer(warped_template, K, w_est_float, T_est_float * 0.001);
+       T_est_float.at<float>(2) +=  1.0;
+       poseDrawer(warped_template, K, w_est_float, T_est_float);
        
        imshow("warped_template",warped_template);
        if( verbosity > 2 ) {
@@ -133,8 +130,9 @@ public:
       merge(w_ch,warped_template);
       Mat outimg = warped_template.clone();
       outimg.convertTo(outimg,CV_8UC3);
-      // Argh, backwards! Need to go the other direction to draw it
-      //poseDrawer(outimg, K, w_est_float, T_est_float);
+      
+      T_est_float.at<float>(2) +=  1.0;
+      poseDrawer(outimg, K, w_est_float, T_est_float);
       imwrite( warpname, outimg );
     }
     double evalCostFuncBasic( ) {
@@ -215,20 +213,24 @@ public:
         H_est.at<float>(2,0) = r31; H_est.at<float>(2,1) = r32; H_est.at<float>(2,2) = 1.0+tz;
 
         H_est =  (K * H_est * K.inv());
-
-
-        warpPerspective(template_img, warped_template, H_est,
-                        template_img.size(), cv::INTER_LINEAR ,
-                        cv::BORDER_CONSTANT, Scalar::all(0));
-
-        warpPerspective(mask_img, warped_mask, H_est,
-                        template_img.size(), cv::INTER_LINEAR ,
-                        cv::BORDER_CONSTANT, Scalar::all(0));
-
-        warpPerspective(mask_border, warped_mask_border, H_est,
+        int nthreads, tid;
+        nthreads = omp_get_num_threads();
+        #pragma omp parallel shared(nthreads, tid)
+        { // fork some threads, each one does one call to expensive warpPerspective
+          tid = omp_get_thread_num();
+          if( tid == 0 )
+            warpPerspective(template_img, warped_template, H_est,
+                              template_img.size(), cv::INTER_LINEAR ,
+                              cv::BORDER_CONSTANT, Scalar::all(0));
+          else if( tid == 1 )
+            warpPerspective(mask_img, warped_mask, H_est,
                           template_img.size(), cv::INTER_LINEAR ,
                           cv::BORDER_CONSTANT, Scalar::all(0));
-
+          else if( tid == 2 )
+            warpPerspective(mask_border, warped_mask_border, H_est,
+                            template_img.size(), cv::INTER_LINEAR,
+                            cv::BORDER_CONSTANT, Scalar::all(0));
+        }
 
         cv::split( warped_template,w_ch );
     }
@@ -290,6 +292,9 @@ public:
         cv::Canny( mask_img, mask_border, 0, 1 ); 
 
         cout << "verbosity level is: " << verbosity << endl;
+        if( verbosity > 0 ) {
+          cv::namedWindow("warped_template");
+        }
         if( verbosity > 2 ) {
           imshow("border",mask_border); waitKey(0);
           imshow("input_image",input_img);
@@ -415,7 +420,9 @@ int main(int argc, char** argv) {
     Options opts;
     if (options(argc, argv, opts))
         return 1;
-
+    
+    omp_set_num_threads(3);
+    
     boost::shared_ptr<RigidTransformFitter> RT(new RigidTransformFitter());
     RT->setup( opts );
 
