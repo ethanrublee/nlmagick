@@ -106,13 +106,15 @@ public:
        cout << "w_est = " << w_est << ", " << "T_est = " << T_est << endl;
        if( verbosity >= 2 ) {
          w_ch[2] = i_ch[2] + warped_mask_border;
-         w_ch[0] = w_ch[0]*0.5 + i_ch[0]*0.5;
+         w_ch[0] = w_ch[0]*0.1 + i_ch[0]*0.9;
          i_ch[1].copyTo(w_ch[1]);
          merge(w_ch,warped_template);
        }
        
        T_est_float.at<float>(2) +=  1.0;
-       poseDrawer(warped_template, K, w_est_float, T_est_float);
+       stringstream ss;
+       ss << "F(x) = " << setprecision(4) << fval_best << ", N-iter = " << iters;
+       poseDrawer(warped_template, K, w_est_float, T_est_float, ss.str() );
        
        imshow("warped_template",warped_template);
        if( verbosity > 2 ) {
@@ -125,7 +127,7 @@ public:
     }
     void writeImageCallback(const string& warpname ) {
       w_ch[2] = i_ch[2] + warped_mask_border;
-      w_ch[0] = w_ch[0]*0.5 + i_ch[0]*0.5;
+      w_ch[0] = w_ch[0]*0.1 + i_ch[0]*0.9;
       i_ch[1].copyTo(w_ch[1]);
       merge(w_ch,warped_template);
       Mat outimg = warped_template.clone();
@@ -146,10 +148,10 @@ public:
       for(int i = 0; i < (int) w_ch.size();i++)
       {          
         double fval_i       =  (norm(w_ch[i],i_ch[i], cv::NORM_L2,warped_mask))/nnz_projected;
-        fval_i             +=  -abs( mean_rgb_in[i] - mean_rgb_out[i] ) * (1.0/255.0);
+        fval_i             +=  -pow(abs( mean_rgb_in[i] - mean_rgb_out[i] ) * (1.0/255.0),2.0);
         fval               +=  fval_i;
       }
-      fval += ( 1e-2 * norm( w_est,NORM_INF) + 1e-6*norm(T_est,NORM_INF) ); // regularize
+      fval += ( 1e-2 * norm( w_est,NORM_L2) + 1e-2*norm(T_est,NORM_L2) ); // regularize
     
       return fval;
     }
@@ -261,9 +263,9 @@ public:
         mask_img     = data[3].clone();
 
         { // setup image-proc operations
-          cv::GaussianBlur( input_img.clone(), input_img, Size(15,15),5.0,5.0 );
-          cv::GaussianBlur( template_img.clone(), template_img, Size(15,15),5.0,5.0 );
-         // cv::GaussianBlur( mask_img.clone(), mask_img, Size(15,15),5.0,5.0 );
+          cv::GaussianBlur( input_img.clone(), input_img, Size(7,7),3.0,3.0 );
+          cv::GaussianBlur( template_img.clone(), template_img, Size(7,7),3.0,3.0 );
+       
           cv::bitwise_and(template_img, mask_img, template_img);
           cv::cvtColor( mask_img.clone(), mask_img, CV_RGB2GRAY );
           mask_img.clone().convertTo(mask_img,CV_8U);
