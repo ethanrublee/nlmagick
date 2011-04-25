@@ -26,6 +26,7 @@ struct Options {
     string guess_initial; // a 'csv' file with omega_hat and T initial guesses
     string x_out_final;   // a 'csv' file with omega_hat and T final solved values
     string algorithm;
+    int smoothFilterSize; // cv::Size( n,n ) and sigma = n/3, n/3 for smoothing image
     int maxSolverTime; // seconds
     int vid;        // /dev/videoN
     int verbosity;  // how much crap to display
@@ -56,6 +57,8 @@ int options(int ac, char ** av, Options& opts) {
             "algorithm for solver, such as NLOPT_LN_BOBYQA, NLOPT_LN_SBPLX, NLOPT_LN_COBYLA.")(
             "maxTime,T", po::value<int>(&opts.maxSolverTime)->default_value(240),
             "max solver run time in seconds.")(
+            "filterSize,s", po::value<int>(&opts.smoothFilterSize)->default_value(15),
+            "size of gaussian smoothing window, and sigma = s/3")(
             "verbose,v", po::value<int>(&opts.verbosity)->default_value(2),
             "verbosity, how much to display crap. between 0 and ~3.");
 
@@ -148,10 +151,10 @@ public:
       for(int i = 0; i < (int) w_ch.size();i++)
       {          
         double fval_i       =  (norm(w_ch[i],i_ch[i], cv::NORM_L2,warped_mask))/nnz_projected;
-        fval_i             +=  -pow(abs( mean_rgb_in[i] - mean_rgb_out[i] ) * (1.0/255.0),2.0);
+        fval_i             +=  -(abs( mean_rgb_in[i] - mean_rgb_out[i] ) )*(1.0/255.0);
         fval               +=  fval_i;
       }
-      fval += ( 1e-2 * norm( w_est,NORM_L2) + 1e-2*norm(T_est,NORM_L2) ); // regularize
+      fval += ( 1e-2 * norm( w_est,NORM_L2) + 1e-1*norm(T_est,NORM_L2) ); // regularize
     
       return fval;
     }
@@ -263,8 +266,10 @@ public:
         mask_img     = data[3].clone();
 
         { // setup image-proc operations
-          cv::GaussianBlur( input_img.clone(), input_img, Size(7,7),3.0,3.0 );
-          cv::GaussianBlur( template_img.clone(), template_img, Size(7,7),3.0,3.0 );
+          int fz     = filterSize;
+          double sig = filterSize / 3.0;
+          cv::GaussianBlur( input_img.clone(), input_img, Size(fz,fz),sig,sig );
+          cv::GaussianBlur( template_img.clone(), template_img, Size(fz,fz),sig,sig );
        
           cv::bitwise_and(template_img, mask_img, template_img);
           cv::cvtColor( mask_img.clone(), mask_img, CV_RGB2GRAY );
@@ -369,6 +374,7 @@ public:
 
       verbosity     = opts.verbosity;
       algorithm     = opts.algorithm;
+      filterSize    = opts.smoothFilterSize;
       maxSolverTime = (double) opts.maxSolverTime;
       cout << "using solver: " << algorithm << endl;
       setup(data);
@@ -376,7 +382,7 @@ public:
 
 public:
     double fval_best;
-    int iters,verbosity;
+    int iters,verbosity,filterSize;
     // some internal persistent data
     Mat K; //camera matrix
     Mat template_img;
