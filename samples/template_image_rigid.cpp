@@ -151,10 +151,11 @@ public:
       for(int i = 0; i < (int) w_ch.size();i++)
       {          
         double fval_i       =  (norm(w_ch[i],i_ch[i], cv::NORM_L2,warped_mask))/nnz_projected;
-        fval_i             +=  -(abs( mean_rgb_in[i] - mean_rgb_out[i] ) )*(1.0/255.0);
+        fval_i             += -(abs( mean_rgb_in[i] - mean_rgb_out[i]          ) )*(1.0/255.0);
+        fval_i             +=  (abs( mean_rgb_in[i] - template_mean_rgb_in[i] ) )*(1.0/255.0)*1e-1;
         fval               +=  fval_i;
       }
-      fval += ( 1e-2 * norm( w_est,NORM_L2) + 1e-1*norm(T_est,NORM_L2) ); // regularize
+      fval += 1e-1 * norm( w_est - w0 ,NORM_L2) + 1e-1*norm(T_est-T0,NORM_L2) ; // regularize
     
       return fval;
     }
@@ -190,14 +191,14 @@ public:
      virtual std::vector<double> ub() const
       {
         double c[6] = {CV_PI / 2, CV_PI / 2, CV_PI/2,
-                       1.0/8,1.0/8,5.0  };
+                       1.0/4,1.0/4,5.0  };
         return std::vector<double>(c,c+6);
       }
 
       virtual std::vector<double> lb() const
       {
         double c[6] = {-CV_PI / 2, -CV_PI / 2, -CV_PI/2,
-                        -1.0/8,-1.0/8,-0.4 };
+                        -1.0/4,-1.0/4,-0.4 };
         return std::vector<double>(c,c+6);
       }
 
@@ -366,9 +367,15 @@ public:
       }
 
 
-      xg_input = vector<float>(6,0); xg_input[5] = 0.0;
+      xg_input = vector<float>(6,0);
+      w0 = Mat::zeros(3,1,CV_64F);
+      T0 = Mat::zeros(3,1,CV_64F);
       if( opts.guess_initial.size() >= 3 ) {
         load_RT_from_csv( opts.guess_initial, xg_input );
+        for( int k = 0; k < 3; k++ ) {
+          w0.at<double>(k) = xg_input[k];
+          T0.at<double>(k) = xg_input[k+3];
+        }
       }
       cout << "x0 = " << endl << Mat(xg_input) << endl;
 
@@ -403,6 +410,10 @@ public:
     vector<Mat> i_ch; // input-image channels
     vector<Mat> w_ch; // warped-template channels
     string algorithm; // what solver to use 
+    
+    // initial inputs
+    Mat w0;
+    Mat T0; 
     
     // solving for these
     Mat T_est;

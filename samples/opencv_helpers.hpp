@@ -61,15 +61,15 @@ inline void poseDrawer(cv::Mat& drawImage, const cv::Mat& K,
 
   projectPoints(Mat(op), w, t, K, Mat(), ip);
   double axes_sz = 120.0;
-  double zmin    = 1e-2; 
+  double zmin    = 5e-2; 
   ip[1] = ip[0] + (ip[1]- ip[0] ) * ( axes_sz / norm( ip[1] - ip[0] ) );
   ip[2] = ip[0] + (-ip[2]+ip[0] ) * ( axes_sz / norm( ip[2] - ip[0] ) );
-  ip[3] = ip[0] + (-ip[3]+ip[0] ) * ( axes_sz / ( zmin + norm( ip[3] - ip[0] ) ) );
+  ip[3] = ip[0] + (-ip[3]+ip[0] ) * ( (1.0/sqrt(2))*axes_sz / ( zmin + norm( ip[3] - ip[0] ) ) );
   
   vector<Scalar> c(4); //colors
   c[0] = Scalar(255, 255, 255);
-  c[1] = Scalar(255, 0, 100);//x
-  c[2] = Scalar(100, 100, 0);//y
+  c[1] = Scalar(255, 0, 50);//x
+  c[2] = Scalar(200, 100, 0);//y
   c[3] = Scalar(50, 100, 255);//z
   line(drawImage, ip[0], ip[1], c[1],3,CV_AA);
   line(drawImage, ip[0], ip[2], c[2],3,CV_AA);
