@@ -103,15 +103,20 @@ public:
         stop_criteria.minf_max   = 1e9;
         return stop_criteria;
     }
-
+    
+    void displayOnWarpedTemplate( )
+    {
+      w_ch[2] = i_ch[2] + 0.5*warped_mask_border;
+      w_ch[1] = w_ch[1]*0.1 + i_ch[1]*0.9;
+      w_ch[0] = i_ch[0] + warped_mask_border;
+      merge(w_ch,warped_template);
+    }
+    
     void   displayCallback(int twait = 0)
     {
        cout << "w_est = " << w_est << ", " << "T_est = " << T_est << endl;
        if( verbosity >= 2 ) {
-         w_ch[2] = i_ch[2] + warped_mask_border;
-         w_ch[0] = w_ch[0]*0.1 + i_ch[0]*0.9;
-         i_ch[1].copyTo(w_ch[1]);
-         merge(w_ch,warped_template);
+         displayOnWarpedTemplate();
        }
        
        T_est_float.at<float>(2) +=  1.0;
@@ -129,10 +134,7 @@ public:
 
     }
     void writeImageCallback(const string& warpname ) {
-      w_ch[2] = i_ch[2] + warped_mask_border;
-      w_ch[0] = w_ch[0]*0.1 + i_ch[0]*0.9;
-      i_ch[1].copyTo(w_ch[1]);
-      merge(w_ch,warped_template);
+      displayOnWarpedTemplate();
       Mat outimg = warped_template.clone();
       outimg.convertTo(outimg,CV_8UC3);
       
@@ -288,16 +290,18 @@ public:
 
         nnz_mask_init = cv::sum(mask_img)[0];
 
-        cv::Scalar mean_rgb_in  = cv::mean(template_img,mask_img);
+
+        // compute and store the mean of inside & outside in the template 
         Mat mask_img_not = mask_img.clone();
         cv::bitwise_not(mask_img,mask_img_not);
-        cv::Scalar mean_rgb_out = cv::mean(template_img,mask_img_not);
         template_mean_rgb_in  = cv::mean(template_img,mask_img);
-        cv::bitwise_not(mask_img,mask_img_not );
         template_mean_rgb_out = cv::mean(template_img,mask_img_not);
 
         // create border mask for display
-        cv::Canny( mask_img, mask_border, 0, 1 ); 
+        int borderSize = 5;
+        cv::Canny( mask_img, mask_border, 0, 1 );
+        mask_border = mask_border*(borderSize/2.0);
+        cv::GaussianBlur(mask_border, mask_border, Size(borderSize,borderSize),3.0,3.0);
 
         cout << "verbosity level is: " << verbosity << endl;
         if( verbosity > 0 ) {

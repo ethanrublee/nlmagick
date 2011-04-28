@@ -69,8 +69,8 @@ inline void poseDrawer(cv::Mat& drawImage, const cv::Mat& K,
   vector<Scalar> c(4); //colors
   c[0] = Scalar(255, 255, 255);
   c[1] = Scalar(255, 0, 50);//x
-  c[2] = Scalar(200, 100, 0);//y
-  c[3] = Scalar(50, 100, 255);//z
+  c[2] = Scalar(100, 200, 0);//y
+  c[3] = Scalar(200, 100, 255);//z
   line(drawImage, ip[0], ip[1], c[1],3,CV_AA);
   line(drawImage, ip[0], ip[2], c[2],3,CV_AA);
   line(drawImage, ip[0], ip[3], c[3],3,CV_AA);
