@@ -106,8 +106,8 @@ public:
     
     void displayOnWarpedTemplate( )
     {
-      w_ch[2] = i_ch[2] + 0.5*warped_mask_border;
-      w_ch[1] = w_ch[1]*0.1 + i_ch[1]*0.9;
+      w_ch[2] = i_ch[2] + warped_mask_border_narrow;
+      w_ch[1] = i_ch[1] + warped_mask_border;
       w_ch[0] = i_ch[0] + warped_mask_border;
       merge(w_ch,warped_template);
     }
@@ -238,6 +238,10 @@ public:
             warpPerspective(mask_border, warped_mask_border, H_est,
                             template_img.size(), cv::INTER_LINEAR,
                             cv::BORDER_CONSTANT, Scalar::all(0));
+          else if( tid == 3 )
+            warpPerspective(mask_border_narrow, warped_mask_border_narrow, H_est,
+                            template_img.size(), cv::INTER_LINEAR,
+                            cv::BORDER_CONSTANT, Scalar::all(0));
         }
 
         cv::split( warped_template,w_ch );
@@ -300,8 +304,9 @@ public:
         // create border mask for display
         int borderSize = 5;
         cv::Canny( mask_img, mask_border, 0, 1 );
-        mask_border = mask_border*(borderSize/2.0);
-        cv::GaussianBlur(mask_border, mask_border, Size(borderSize,borderSize),3.0,3.0);
+        mask_border_narrow = mask_border.clone();
+        mask_border = mask_border*(borderSize);
+        cv::GaussianBlur(mask_border.clone(), mask_border, Size(borderSize,borderSize),3.0,3.0);
 
         cout << "verbosity level is: " << verbosity << endl;
         if( verbosity > 0 ) {
@@ -400,9 +405,11 @@ public:
     Mat weighted_mask; // TODO: weight the mask by this ... less at the edges!
     Mat mask_img;
     Mat mask_border;
+    Mat mask_border_narrow;
     Mat input_img;
     Mat warped_template; // warp template to match input
     Mat warped_mask_border;
+    Mat warped_mask_border_narrow;
     Mat warped_mask;
     Scalar template_mean_rgb_out;
     Scalar template_mean_rgb_in;
@@ -444,7 +451,7 @@ int main(int argc, char** argv) {
     if (options(argc, argv, opts))
         return 1;
     
-    omp_set_num_threads(3);
+    omp_set_num_threads(4);
     
     boost::shared_ptr<RigidTransformFitter> RT(new RigidTransformFitter());
     RT->setup( opts );
