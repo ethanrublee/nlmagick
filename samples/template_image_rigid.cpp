@@ -106,7 +106,7 @@ public:
     
     void displayOnWarpedTemplate( )
     {
-      w_ch[2] = i_ch[2] + warped_mask_border_narrow;
+      w_ch[2] = i_ch[2] + warped_mask_border_narrow + warped_mask_border;
       w_ch[1] = i_ch[1] + warped_mask_border;
       w_ch[0] = i_ch[0] + warped_mask_border;
       merge(w_ch,warped_template);
@@ -151,10 +151,10 @@ public:
       cv::Scalar mean_rgb_out = cv::mean(input_img,warped_mask_not);
       
       for(int i = 0; i < (int) w_ch.size();i++)
-      {          
+      { // TODO: pass flags for minor modifications to these weights externally!         
         double fval_i       =  (norm(w_ch[i],i_ch[i], cv::NORM_L2,warped_mask))/nnz_projected;
-        fval_i             += -(abs( mean_rgb_in[i] - mean_rgb_out[i]          ) )*(1.0/255.0);
-        fval_i             +=  (abs( mean_rgb_in[i] - template_mean_rgb_in[i] ) )*(1.0/255.0)*1e-1;
+        fval_i             += -(pow( (mean_rgb_in[i] - mean_rgb_out[i]        ),2.0))*(1.0/255.0)*1e-1;
+        fval_i             +=  (pow( (mean_rgb_in[i] - template_mean_rgb_in[i]),2.0))*(1.0/255.0)*5e-1;
         fval               +=  fval_i;
       }
       fval += 1e-1 * norm( w_est - w0 ,NORM_L2) + 1e-1*norm(T_est-T0,NORM_L2) ; // regularize
@@ -302,12 +302,13 @@ public:
         template_mean_rgb_out = cv::mean(template_img,mask_img_not);
 
         // create border mask for display
-        int borderSize = 5;
+        int borderSize = 9;
         cv::Canny( mask_img, mask_border, 0, 1 );
         mask_border_narrow = mask_border.clone();
         mask_border = mask_border*(borderSize);
         cv::GaussianBlur(mask_border.clone(), mask_border, Size(borderSize,borderSize),3.0,3.0);
-
+        cv::GaussianBlur(mask_border_narrow.clone(), mask_border_narrow, Size(3,3),1.0,1.0);
+        
         cout << "verbosity level is: " << verbosity << endl;
         if( verbosity > 0 ) {
           cv::namedWindow("warped_template");
