@@ -107,15 +107,20 @@ public:
         stop_criteria.minf_max   = 1e9;
         return stop_criteria;
     }
-
+    
+    void displayOnWarpedTemplate( )
+    {
+      w_ch[2] = i_ch[2] + warped_mask_border_narrow + warped_mask_border;
+      w_ch[1] = i_ch[1] + warped_mask_border;
+      w_ch[0] = i_ch[0] + warped_mask_border;
+      merge(w_ch,warped_template);
+    }
+    
     void   displayCallback(int twait = 0)
     {
        cout << "w_est = " << w_est << ", " << "T_est = " << T_est << endl;
        if( verbosity >= 2 ) {
-         w_ch[2] = i_ch[2] + warped_mask_border;
-         w_ch[0] = w_ch[0]*0.1 + i_ch[0]*0.9;
-         i_ch[1].copyTo(w_ch[1]);
-         merge(w_ch,warped_template);
+         displayOnWarpedTemplate();
        }
        
        T_est_float.at<float>(2) +=  1.0;
@@ -136,10 +141,7 @@ public:
 
     }
     void writeImageCallback(const string& warpname ) {
-      w_ch[2] = i_ch[2] + warped_mask_border;
-      w_ch[0] = w_ch[0]*0.1 + i_ch[0]*0.9;
-      i_ch[1].copyTo(w_ch[1]);
-      merge(w_ch,warped_template);
+      displayOnWarpedTemplate();
       Mat outimg = warped_template.clone();
       outimg.convertTo(outimg,CV_8UC3);
       
@@ -156,12 +158,13 @@ public:
       cv::Scalar mean_rgb_out = cv::mean(input_img,warped_mask_not);
       
       for(int i = 0; i < (int) w_ch.size();i++)
-      {          
+      { // TODO: pass flags for minor modifications to these weights externally!         
         double fval_i       =  (norm(w_ch[i],i_ch[i], cv::NORM_L2,warped_mask))/nnz_projected;
-        fval_i             +=  -(abs( mean_rgb_in[i] - mean_rgb_out[i] ) )*(1.0/255.0);
+        fval_i             += -(pow( (mean_rgb_in[i] - mean_rgb_out[i]        ),2.0))*(1.0/255.0)*1e-1;
+        fval_i             +=  (pow( (mean_rgb_in[i] - template_mean_rgb_in[i]),2.0))*(1.0/255.0)*5e-1;
         fval               +=  fval_i;
       }
-      fval += ( 1e-2 * norm( w_est,NORM_L2) + 1e-1*norm(T_est,NORM_L2) ); // regularize
+      fval += 1e-1 * norm( w_est - w0 ,NORM_L2) + 1e-1*norm(T_est-T0,NORM_L2) ; // regularize
     
       return fval;
     }
@@ -197,14 +200,14 @@ public:
      virtual std::vector<double> ub() const
       {
         double c[6] = {CV_PI / 2, CV_PI / 2, CV_PI/2,
-                       1.0/8,1.0/8,5.0  };
+                       1.0/4,1.0/4,5.0  };
         return std::vector<double>(c,c+6);
       }
 
       virtual std::vector<double> lb() const
       {
         double c[6] = {-CV_PI / 2, -CV_PI / 2, -CV_PI/2,
-                        -1.0/8,-1.0/8,-0.4 };
+                        -1.0/4,-1.0/4,-0.4 };
         return std::vector<double>(c,c+6);
       }
 
@@ -240,6 +243,10 @@ public:
                           cv::BORDER_CONSTANT, Scalar::all(0));
           else if( tid == 2 )
             warpPerspective(mask_border, warped_mask_border, H_est,
+                            template_img.size(), cv::INTER_LINEAR,
+                            cv::BORDER_CONSTANT, Scalar::all(0));
+          else if( tid == 3 )
+            warpPerspective(mask_border_narrow, warped_mask_border_narrow, H_est,
                             template_img.size(), cv::INTER_LINEAR,
                             cv::BORDER_CONSTANT, Scalar::all(0));
         }
@@ -294,17 +301,21 @@ public:
 
         nnz_mask_init = cv::sum(mask_img)[0];
 
-        cv::Scalar mean_rgb_in  = cv::mean(template_img,mask_img);
+
+        // compute and store the mean of inside & outside in the template 
         Mat mask_img_not = mask_img.clone();
         cv::bitwise_not(mask_img,mask_img_not);
-        cv::Scalar mean_rgb_out = cv::mean(template_img,mask_img_not);
         template_mean_rgb_in  = cv::mean(template_img,mask_img);
-        cv::bitwise_not(mask_img,mask_img_not );
         template_mean_rgb_out = cv::mean(template_img,mask_img_not);
 
         // create border mask for display
-        cv::Canny( mask_img, mask_border, 0, 1 ); 
-
+        int borderSize = 9;
+        cv::Canny( mask_img, mask_border, 0, 1 );
+        mask_border_narrow = mask_border.clone();
+        mask_border = mask_border*(borderSize);
+        cv::GaussianBlur(mask_border.clone(), mask_border, Size(borderSize,borderSize),3.0,3.0);
+        cv::GaussianBlur(mask_border_narrow.clone(), mask_border_narrow, Size(3,3),1.0,1.0);
+        
         cout << "verbosity level is: " << verbosity << endl;
         if( verbosity > 0 ) {
           cv::namedWindow("warped_template");
@@ -393,9 +404,15 @@ public:
       }
 
 
-      xg_input = vector<float>(6,0); xg_input[5] = 0.0;
+      xg_input = vector<float>(6,0);
+      w0 = Mat::zeros(3,1,CV_64F);
+      T0 = Mat::zeros(3,1,CV_64F);
       if( opts.guess_initial.size() >= 3 ) {
         load_RT_from_csv( opts.guess_initial, xg_input );
+        for( int k = 0; k < 3; k++ ) {
+          w0.at<double>(k) = xg_input[k];
+          T0.at<double>(k) = xg_input[k+3];
+        }
       }
       cout << "x0 = " << endl << Mat(xg_input) << endl;
 
@@ -416,9 +433,11 @@ public:
     Mat weighted_mask; // TODO: weight the mask by this ... less at the edges!
     Mat mask_img;
     Mat mask_border;
+    Mat mask_border_narrow;
     Mat input_img;
     Mat warped_template; // warp template to match input
     Mat warped_mask_border;
+    Mat warped_mask_border_narrow;
     Mat warped_mask;
     Scalar template_mean_rgb_out;
     Scalar template_mean_rgb_in;
@@ -430,6 +449,10 @@ public:
     vector<Mat> i_ch; // input-image channels
     vector<Mat> w_ch; // warped-template channels
     string algorithm; // what solver to use 
+    
+    // initial inputs
+    Mat w0;
+    Mat T0; 
     
     // solving for these
     Mat T_est;
@@ -456,7 +479,7 @@ int main(int argc, char** argv) {
     if (options(argc, argv, opts))
         return 1;
     
-    omp_set_num_threads(3);
+    omp_set_num_threads(4);
     
     boost::shared_ptr<RigidTransformFitter> RT(new RigidTransformFitter());
     RT->setup( opts );
