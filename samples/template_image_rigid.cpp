@@ -19,6 +19,7 @@ namespace {
 
 struct Options {
     string k_file;
+    string focal_in;
     string input_img; // what we're solving on. no mask here.
     string template_img;
     string mask_img;  // corresponds to "template". 1 in the planar area we want.
@@ -37,8 +38,11 @@ int options(int ac, char ** av, Options& opts) {
     po::options_description desc("Allowed options");
     desc.add_options()("help", "Produce help message.")(
             "intrinsics,K",
-            po::value<string>(&opts.k_file),
-            "The camera intrinsics file, should be yaml and have atleast \"K:...\". Required.")(
+            po::value<string>(&opts.k_file)->default_value(""),
+            "The camera intrinsics file, yaml, from opencv calibration; provide either K or F but not both!")(
+            "focalscale,F",
+            po::value<string>(&opts.focal_in)->default_value(""),
+            "The focal scale, like 695.35; provide either K or F but not both!")(
             "inputimage,i", po::value<string>(&opts.input_img)->default_value(""),
             "input image where we want to find something's pose. Required / might use webcam otherwise.")(
             "templateimage,t", po::value<string>(&opts.template_img),
@@ -123,9 +127,12 @@ public:
        if( verbosity > 2 ) {
           imshow("warped_mask",warped_mask);
        }
-       waitKey(twait);
+       char key = waitKey(twait);
        cout << "iters: " << iters << endl;
-       waitKey(twait);
+       if( 'q' == key ) {
+         cout <<"q was pressed, exiting! " << endl;
+         exit(0);
+       }
 
     }
     void writeImageCallback(const string& warpname ) {
@@ -350,13 +357,33 @@ public:
     void setup( const Options& opts ) {
       cv::Mat K,D;
       cv::Size image_size;
-      readKfromCalib(K,D,image_size,opts.k_file);
+
       vector<Mat> data(4); // poltergeist to send to RT fitter
-      data[0]    = K;
       imread( opts.input_img).convertTo(data[1],CV_8UC3);
       imread( opts.template_img).convertTo(data[2],CV_8UC3);
       imread( opts.mask_img).convertTo(data[3],CV_8UC3);
 
+      if( opts.k_file.empty() ) {
+        cout << "no calibration file! " << endl;
+        K = Mat::zeros(3,3,CV_32F);
+        K.at<float>(2,2) = 1.0;
+        K.at<float>(0,2) = (data[1].cols-1.0)/2;
+        K.at<float>(1,2) = (data[1].cols-1.0)/2;
+        if( opts.focal_in.empty() ) {
+          cout << "using a bogus K! " << endl;
+          K.at<float>(0,0) = data[1].cols;
+          K.at<float>(1,1) = data[1].cols;
+        } else {
+          cout << "using f-scale " << opts.focal_in << endl;
+          K.at<float>(0,0) = boost::lexical_cast<float>(opts.focal_in);
+          K.at<float>(1,1) = boost::lexical_cast<float>(opts.focal_in);
+        }
+      } else {
+        cout << "reading K from calibration file " << opts.k_file << endl;
+        readKfromCalib(K,D,image_size,opts.k_file);
+      }
+
+      data[0] = K;
       for( int k = 0; k < (int) data.size(); k++ ) {
         if( data[k].empty() ) {
           std::cerr << k << std::endl;
