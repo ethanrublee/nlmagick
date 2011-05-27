@@ -59,7 +59,8 @@ inline void poseDrawer(cv::Mat& drawImage, const cv::Mat& K,
   op[1] = x, op[2] = y, op[3] = z, op[0] = o;
   vector<Point2f> ip;
 
-  projectPoints(Mat(op), w, t, K, Mat(), ip);
+  Mat D = Mat::zeros(4,1,CV_32F);
+  projectPoints(Mat(op), w, t, K, D, ip);
   double axes_sz = 120.0;
   double zmin    = 5e-2; 
   ip[1] = ip[0] + (ip[1]- ip[0] ) * ( axes_sz / norm( ip[1] - ip[0] ) );
