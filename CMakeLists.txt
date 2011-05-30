@@ -42,7 +42,7 @@ macro(define_module name)
 
 endmacro()
 
-define_module(nlopt)
+define_module(nlmagick)
 
 add_subdirectory(samples)
 
