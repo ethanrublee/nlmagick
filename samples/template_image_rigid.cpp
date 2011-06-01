@@ -157,7 +157,11 @@ public:
     imwrite( warpname, outimg );
   }
   double evalCostFuncBasic( ) {
-    double fval = 20.0; // to avoid confusing negative values of F(X), doesn't matter though...
+    double fval = 20.0;            // avoid negative values of F(X)
+    double lambda_T       = 1e-1;  // TODO: set from flag 
+    double lambda_W       = 1e-1;  // TODO: set from flag
+    double alpha_in_out   = 1e-1;  // TODO: set from flag
+    double alpha_template = 1e-1;  // TODO: set from flag
     double nnz_projected = (cv::sum(warped_mask)[0] + 1e-2) * (1 / 255.0);      
     static Mat warped_mask_not;
     cv::Scalar mean_rgb_in  = cv::mean(input_img,warped_mask);
@@ -166,17 +170,13 @@ public:
     
     for(int i = 0; i < (int) w_ch.size();i++)
     { // TODO: pass flags for minor modifications to these weights externally!         
-      double fval_i       =  (norm(w_ch[i],i_ch[i], cv::NORM_L1,warped_mask))/(nnz_projected);
-      fval_i             += -(pow( (mean_rgb_in[i] - mean_rgb_out[i]        ),2.0))*(1.0/255.0)*1e-1;
-      fval_i             +=  (pow( (mean_rgb_in[i] - template_mean_rgb_in[i]),2.0))*(1.0/255.0)*1e-1;
+      double fval_i       =  (norm(w_ch[i],i_ch[i], cv::NORM_L2,warped_mask))/sqrt(nnz_projected);
+      fval_i             += -(pow( (mean_rgb_in[i] - mean_rgb_out[i]        ),2.0))*(1.0/255.0)*alpha_in_out;
+      fval_i             +=  (pow( (mean_rgb_in[i] - template_mean_rgb_in[i]),2.0))*(1.0/255.0)*alpha_template;
       fval               +=  fval_i;
     }
-    double lambda_T       = 1e-1;  // TODO: set from flag 
-    double lambda_W       = 1e-1; // TODO: set from flag
+
     fval += lambda_W * norm( w_est - w0 ,NORM_L1) + lambda_T * norm(T_est-T0,NORM_L1); // regularize
-    
-    fval += 0*pow( 1e-1 * (lambda_W * norm( w_est - w0 ,NORM_L2) ),4.0); 
-    fval += 0*pow( 1e-1 * (lambda_T * norm( T_est - T0 ,NORM_L2) ),4.0);
     
     return fval;
   }
