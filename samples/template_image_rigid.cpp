@@ -45,8 +45,8 @@ namespace {
         po::value<string>(&opts.k_file)->default_value(""),
         "The camera intrinsics file, yaml, from opencv calibration, Required. ")(
             "focalscale,F",
-            po::value<string>(&opts.focal_ratio)->default_value("1.0"),
-            "The focal ratio, 1.0 means use what's in K, otherwise scale the (1,1), (2,2) entries!")(
+            po::value<string>(&opts.focal_ratio)->default_value("0.0"),
+            "The focal ratio, 1.0 means use what's in K, otherwise set the (1,1), (2,2) entries!")(
                 "inputimage,i", po::value<string>(&opts.input_img)->default_value(""),
                 "input image where we want to find something's pose. Required / might use webcam otherwise.")(
                     "templateimage,t", po::value<string>(&opts.template_img),
@@ -125,6 +125,7 @@ public:
     cout << "w_est = " << w_est << ", " << "T_est = " << T_est << endl;
     if( verbosity >= 2 ) {
       displayOnWarpedTemplate();
+      waitKey(1);
     }
     
     T_est_float.at<float>(2) +=  1.0;
@@ -165,12 +166,17 @@ public:
     
     for(int i = 0; i < (int) w_ch.size();i++)
     { // TODO: pass flags for minor modifications to these weights externally!         
-      double fval_i       =  (norm(w_ch[i],i_ch[i], cv::NORM_L2,warped_mask))/sqrt(nnz_projected);
+      double fval_i       =  (norm(w_ch[i],i_ch[i], cv::NORM_L1,warped_mask))/(nnz_projected);
       fval_i             += -(pow( (mean_rgb_in[i] - mean_rgb_out[i]        ),2.0))*(1.0/255.0)*1e-1;
       fval_i             +=  (pow( (mean_rgb_in[i] - template_mean_rgb_in[i]),2.0))*(1.0/255.0)*1e-1;
       fval               +=  fval_i;
     }
-    fval += 1e-1 * norm( w_est - w0 ,NORM_L2) + 1e-1*norm(T_est-T0,NORM_L2) ; // regularize
+    double lambda_T       = 1e-1;  // TODO: set from flag 
+    double lambda_W       = 1e-1; // TODO: set from flag
+    fval += lambda_W * norm( w_est - w0 ,NORM_L1) + lambda_T * norm(T_est-T0,NORM_L1); // regularize
+    
+    fval += 0*pow( 1e-1 * (lambda_W * norm( w_est - w0 ,NORM_L2) ),4.0); 
+    fval += 0*pow( 1e-1 * (lambda_T * norm( T_est - T0 ,NORM_L2) ),4.0);
     
     return fval;
   }
@@ -206,14 +212,14 @@ public:
   virtual std::vector<double> ub() const
   {
     double c[6] = {CV_PI / 2, CV_PI / 2, CV_PI/2,
-                   1.0/4,1.0/4,5.0  };
+                   1.0/4,1.0/4,2.0  };
     return std::vector<double>(c,c+6);
   }
   
   virtual std::vector<double> lb() const
   {
     double c[6] = {-CV_PI / 2, -CV_PI / 2, -CV_PI/2,
-                   -1.0/4,-1.0/4,-0.6 };
+                   -1.0/4,-1.0/4,-0.5 };
     return std::vector<double>(c,c+6);
   }
   
@@ -318,7 +324,7 @@ public:
     template_mean_rgb_out = cv::mean(template_img,mask_img_not);
     
     // create border mask for display
-    int borderSize = 9;
+    int borderSize = (int) ( mask_img.rows / 100.0 + 0.5 );
     cv::Canny( mask_img, mask_border, 0, 1 );
     mask_border_narrow = mask_border.clone();
     mask_border = mask_border*(borderSize);
@@ -386,13 +392,16 @@ public:
     
     cout << "reading K from calibration file " << opts.k_file << endl;
     readKfromCalib(K,D,image_size,opts.k_file);
-    cout << "using f-scale " << opts.focal_ratio << endl;
-    K.at<float>(0,0) *= boost::lexical_cast<float>(opts.focal_ratio);
-    K.at<float>(1,1) *= boost::lexical_cast<float>(opts.focal_ratio);
-    this->f_ratio     = boost::lexical_cast<float>(opts.focal_ratio);
+
+    f_ratio     = boost::lexical_cast<float>(opts.focal_ratio);
+    if( f_ratio > 0.0 ) {
+      cout << "using f-scale " << opts.focal_ratio << endl;
+      K.at<float>(0,0) = boost::lexical_cast<float>(opts.focal_ratio);
+      K.at<float>(1,1) = boost::lexical_cast<float>(opts.focal_ratio);
+    }
     this->solver_prefix = opts.save_solver_imgs_prefix;
     
-    data[0] = K;
+    K.copyTo(data[0]);
     for( int k = 0; k < (int) data.size(); k++ ) {
       if( data[k].empty() ) {
         std::cerr << k << std::endl;
@@ -400,21 +409,11 @@ public:
         exit(1);
       }
     }
-    if( abs( f_ratio - 1.0 ) > 1e-6) 
-    {
-      cout << "rescaling template and mask due to zoom scale..." << endl;
-      cout << "if template is not image-centered, bad things might happen... " << endl;
-      Mat affineTransform = cv::Mat::zeros(2,3,CV_32F);
-      affineTransform.at<float>(0,0) = f_ratio;
-      affineTransform.at<float>(1,1) = f_ratio;
-      cv::warpAffine(data[2].clone(),data[2],affineTransform, data[2].size() ); 
-      cv::warpAffine(data[3].clone(),data[3],affineTransform, data[2].size() );
-    }
     
     xg_input = vector<float>(6,0);
     w0 = Mat::zeros(3,1,CV_64F);
     T0 = Mat::zeros(3,1,CV_64F);
-    T0.at<double>(2) = -0.5;
+    T0.at<double>(2) = -0.4;
     if( opts.guess_initial.size() >= 3 ) {
       load_RT_from_csv( opts.guess_initial, xg_input );
       for( int k = 0; k < 3; k++ ) {
@@ -507,6 +506,7 @@ int main(int argc, char** argv) {
   printBodyCount(opt_core);
   RigidTransformFitter::write_RT_to_csv( opts.x_out_final, optimal_W_and_T );
   RT->writeImageCallback(opts.out_warp_img);
+  waitKey(5);
   cout << "DONE." << endl;
   return 0;
   
