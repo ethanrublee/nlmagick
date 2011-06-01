@@ -411,12 +411,13 @@ public:
     readKfromCalib(K,D,image_size,opts.k_file);
 
     f_ratio     = boost::lexical_cast<float>(opts.focal_ratio);
-    if( f_ratio > 0.0 ) {
+    if( f_ratio > 0.0 ) 
+    { // when the camera zooms but we don't feel like having multiple calibration files 
       cout << "using f-scale " << opts.focal_ratio << endl;
       K.at<float>(0,0) = boost::lexical_cast<float>(opts.focal_ratio);
       K.at<float>(1,1) = boost::lexical_cast<float>(opts.focal_ratio);
     }
-    this->solver_prefix = opts.save_solver_imgs_prefix;
+    solver_prefix = opts.save_solver_imgs_prefix;
     
     K.copyTo(data[0]);
     for( int k = 0; k < (int) data.size(); k++ ) {
