@@ -24,51 +24,70 @@ namespace {
     string template_img;
     string mask_img;  // corresponds to "template". 1 in the planar area we want.
     string out_warp_img;
+    string save_solver_imgs_prefix; // save intermediate solver output to files xxxx_000n.png    
     string guess_initial; // a 'csv' file with omega_hat and T initial guesses
     string x_out_final;   // a 'csv' file with omega_hat and T final solved values
     string algorithm;
+    
+    string lambdaT; // regularizer for translation
+    string lambdaW; // regularizer for rotation
+    string alphaIO; // weight for inside-outside disparity
+    string alphaIT; // weight for inside-template similarity
+
     int smoothFilterSize; // cv::Size( n,n ) and sigma = n/3, n/3 for smoothing image
     int maxSolverTime; // seconds
     int vid;        // /dev/videoN
     int verbosity;  // how much crap to display
-    string save_solver_imgs_prefix; // save intermediate solver output to files xxxx_000n.png
+    int waitKeyLength;
+    
+    
   };
   
   int options(int ac, char ** av, Options& opts) {
     // Declare the supported options.
     po::options_description desc("Allowed options");
     desc.add_options()("help", "Produce help message.")(
-        "solverprefix,p",
-        po::value<string>(&opts.save_solver_imgs_prefix)->default_value(""),
-        "solver output intermediate images prefix, saves -v2 display to prefix_000x.png ")(
-        "intrinsics,K",
-        po::value<string>(&opts.k_file)->default_value(""),
-        "The camera intrinsics file, yaml, from opencv calibration, Required. ")(
-            "focalscale,F",
-            po::value<string>(&opts.focal_ratio)->default_value("0.0"),
-            "The focal ratio, 1.0 means use what's in K, otherwise set the (1,1), (2,2) entries!")(
-                "inputimage,i", po::value<string>(&opts.input_img)->default_value(""),
-                "input image where we want to find something's pose. Required / might use webcam otherwise.")(
-                    "templateimage,t", po::value<string>(&opts.template_img),
-                    "template image where pose is identity matrix. Required.")(
-                        "outwarpimage,w", po::value<string>(&opts.out_warp_img)->default_value("warped.jpg"),
-                        "output for warped image. default: warped.jpg")(
-                            "initguess,g", po::value<string>(&opts.guess_initial)->default_value("x"),
-                            "initial guess csv file for params. default: none, all 0's")(
-                                "finalxval,f", po::value<string>(&opts.x_out_final)->default_value("wt_final.out"),
-                                "final output file csv for w,T solved values.")(
-                                    "maskimage,m", po::value<string>(&opts.mask_img),
-                                    "mask: non-zero ROI in template. Required / might use entire image otherwise. ")(
-                                        "video,V", po::value<int>(&opts.vid)->default_value(0),
-                                        "Video device number, find video by ls /dev/video*.")(
-                                            "algorithm,a", po::value<string>(&opts.algorithm)->default_value("NLOPT_LN_SBPLX"),
-                                            "algorithm for solver, such as NLOPT_LN_BOBYQA, NLOPT_LN_SBPLX, NLOPT_LN_COBYLA.")(
-                                                "maxTime,T", po::value<int>(&opts.maxSolverTime)->default_value(240),
-                                                "max solver run time in seconds.")(
-                                                    "filterSize,s", po::value<int>(&opts.smoothFilterSize)->default_value(15),
-                                                    "size of gaussian smoothing window, and sigma = s/3")(
-                                                        "verbose,v", po::value<int>(&opts.verbosity)->default_value(2),
-                                                        "verbosity, how much to display crap. between 0 and 3.");
+"solverprefix,p",
+po::value<string>(&opts.save_solver_imgs_prefix)->default_value(""),
+"solver output intermediate images prefix, saves -v2 display to prefix_000x.png ")(
+"intrinsics,K",
+po::value<string>(&opts.k_file)->default_value(""),
+"The camera intrinsics file, yaml, from opencv calibration, Required. ")(
+"focalscale,F",
+po::value<string>(&opts.focal_ratio)->default_value("0.0"),
+"The focal ratio, 1.0 means use what's in K, otherwise set the (1,1), (2,2) entries!")(
+"inputimage,i", po::value<string>(&opts.input_img)->default_value(""),
+"input image where we want to find something's pose. Required / might use webcam otherwise.")(
+"templateimage,t", po::value<string>(&opts.template_img),
+"template image where pose is identity matrix. Required.")(
+"outwarpimage,w", po::value<string>(&opts.out_warp_img)->default_value("warped.jpg"),
+"output for warped image. default: warped.jpg")(
+"initguess,g", po::value<string>(&opts.guess_initial)->default_value("x"),
+"initial guess csv file for params. default: none, all 0's")(
+"finalxval,f", po::value<string>(&opts.x_out_final)->default_value("wt_final.out"),
+"final output file csv for w,T solved values.")(
+"maskimage,m", po::value<string>(&opts.mask_img),
+"mask: non-zero ROI in template. Required / might use entire image otherwise. ")(
+"video,V", po::value<int>(&opts.vid)->default_value(0),
+"Video device number, find video by ls /dev/video*.")(
+"algorithm,a", po::value<string>(&opts.algorithm)->default_value("NLOPT_LN_SBPLX"),
+"algorithm for solver, such as NLOPT_LN_BOBYQA, NLOPT_LN_SBPLX, NLOPT_LN_COBYLA.")(
+"maxTime,T", po::value<int>(&opts.maxSolverTime)->default_value(240),
+"max solver run time in seconds.")(
+"filterSize,s", po::value<int>(&opts.smoothFilterSize)->default_value(15),
+"size of gaussian smoothing window, and sigma = s/3")(
+"verbose,v", po::value<int>(&opts.verbosity)->default_value(2),
+"verbosity, how much to display crap. between 0 and 3.")(
+"waittime,W", po::value<int>(&opts.waitKeyLength)->default_value(5),
+"number of milliseconds to wait on display (needs to be higher if running from matlab for example)")(
+"lambdaT,A", po::value<string>(&opts.lambdaT)->default_value("0.1"),
+"T regularizer weight")(
+"lambdaW,R", po::value<string>(&opts.lambdaW)->default_value("0.1"),
+"W regularizer weight")(
+"alphaIO,C", po::value<string>(&opts.alphaIO)->default_value("0.1"),
+"chan-vese-like weight, in/out disparity")(
+"alphaIT,D", po::value<string>(&opts.alphaIT)->default_value("0.1"),
+"reverse chan-vese-like weight, in/in-template similarity");
     
     po::variables_map vm;
     po::store(po::parse_command_line(ac, av, desc), vm);
@@ -157,11 +176,8 @@ public:
     imwrite( warpname, outimg );
   }
   double evalCostFuncBasic( ) {
-    double fval = 20.0;            // avoid negative values of F(X)
-    double lambda_T       = 1e-1;  // TODO: set from flag 
-    double lambda_W       = 1e-1;  // TODO: set from flag
-    double alpha_in_out   = 1e-1;  // TODO: set from flag
-    double alpha_template = 1e-1;  // TODO: set from flag
+    double fval = 100.0 * (alpha_in_out);            // avoid negative values of F(X)
+   
     double nnz_projected = (cv::sum(warped_mask)[0] + 1e-2) * (1 / 255.0);      
     static Mat warped_mask_not;
     cv::Scalar mean_rgb_in  = cv::mean(input_img,warped_mask);
@@ -170,7 +186,7 @@ public:
     
     for(int i = 0; i < (int) w_ch.size();i++)
     { // TODO: pass flags for minor modifications to these weights externally!         
-      double fval_i       =  (norm(w_ch[i],i_ch[i], cv::NORM_L2,warped_mask))/sqrt(nnz_projected);
+      double fval_i       =  (norm(w_ch[i],i_ch[i], cv::NORM_L1,warped_mask))/(nnz_projected);
       fval_i             += -(pow( (mean_rgb_in[i] - mean_rgb_out[i]        ),2.0))*(1.0/255.0)*alpha_in_out;
       fval_i             +=  (pow( (mean_rgb_in[i] - template_mean_rgb_in[i]),2.0))*(1.0/255.0)*alpha_template;
       fval               +=  fval_i;
@@ -197,7 +213,7 @@ public:
     if( fval < fval_best ) { 
       if( verbosity >= 1 ) {
         if( verbosity >= 2 ) {
-          displayCallback(5);
+          displayCallback( input_opts.waitKeyLength );
         }
         if( rand() % 3 == 1 ) {
           cout << "fval: " << fval << ", iters: " << iters
@@ -384,6 +400,7 @@ public:
   void setup( const Options& opts ) {
     cv::Mat K,D;
     cv::Size image_size;
+    input_opts = opts;
     
     vector<Mat> data(4); // poltergeist to send to RT fitter
     imread( opts.input_img).convertTo(data[1],CV_8UC3);
@@ -429,11 +446,20 @@ public:
     maxSolverTime = (double) opts.maxSolverTime;
     cout << "using solver: " << algorithm << endl;
     setup(data);
+
+    lambda_T       = boost::lexical_cast<double>(opts.lambdaT); 
+    lambda_W       = boost::lexical_cast<double>(opts.lambdaW);
+    alpha_in_out   = boost::lexical_cast<double>(opts.alphaIO);
+    alpha_template = boost::lexical_cast<double>(opts.alphaIT);
+    printf("regularizers: %f, %f, %f, %f \n",lambda_T,lambda_W,alpha_in_out,alpha_template);
+    cout << endl;
   }
   
 public:
   // some internal persistent data
   
+  double lambda_T, lambda_W, alpha_in_out, alpha_template;
+
   double fval_best;
   int iters,verbosity,filterSize;
   
@@ -473,6 +499,7 @@ public:
   Mat R_est;
   Mat H_est;
   
+  Options  input_opts; 
 };
 
 void printBodyCount( NLOptCore& opt_core )
