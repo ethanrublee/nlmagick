@@ -176,7 +176,7 @@ public:
     imwrite( warpname, outimg );
   }
   double evalCostFuncBasic( ) {
-    double fval = 100.0 * (alpha_in_out);            // avoid negative values of F(X)
+    double fval = 0.0;
    
     double nnz_projected = (cv::sum(warped_mask)[0] + 1e-2) * (1 / 255.0);      
     static Mat warped_mask_not;
@@ -227,15 +227,19 @@ public:
   }
   virtual std::vector<double> ub() const
   {
-    double c[6] = {CV_PI / 2, CV_PI / 2, CV_PI/2,
-                   1.0/4,1.0/4,2.0  };
+    double c[6] = {CV_PI / 6, CV_PI / 6, CV_PI/6, 0.2, 0.2, 0.2  };
+    for( int k = 0; k < 6; k++ ) {
+      c[k] += WT[k];
+    }
     return std::vector<double>(c,c+6);
   }
   
   virtual std::vector<double> lb() const
   {
-    double c[6] = {-CV_PI / 2, -CV_PI / 2, -CV_PI/2,
-                   -1.0/4,-1.0/4,-0.5 };
+    double c[6] = {-CV_PI / 6, -CV_PI / 6, -CV_PI/6, -0.2, -0.2, -0.2  };
+    for( int k = 0; k < 6; k++ ) {
+      c[k] += WT[k];
+    }
     return std::vector<double>(c,c+6);
   }
   
