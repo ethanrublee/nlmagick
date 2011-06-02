@@ -229,7 +229,7 @@ public:
   {
     double c[6] = {CV_PI / 6, CV_PI / 6, CV_PI/6, 0.2, 0.2, 0.2  };
     for( int k = 0; k < 6; k++ ) {
-      c[k] += WT[k];
+      c[k] += xg_input[k];
     }
     return std::vector<double>(c,c+6);
   }
@@ -238,7 +238,7 @@ public:
   {
     double c[6] = {-CV_PI / 6, -CV_PI / 6, -CV_PI/6, -0.2, -0.2, -0.2  };
     for( int k = 0; k < 6; k++ ) {
-      c[k] += WT[k];
+      c[k] += xg_input[k];
     }
     return std::vector<double>(c,c+6);
   }
