@@ -133,9 +133,9 @@ public:
   
   void displayOnWarpedTemplate( )
   {
-    w_ch[2] = i_ch[2] + warped_mask_border_narrow + warped_mask_border;
-    w_ch[1] = i_ch[1] + warped_mask_border;
     w_ch[0] = i_ch[0] + warped_mask_border;
+    w_ch[1] = i_ch[1] + warped_mask_border_narrow;
+    w_ch[2] = i_ch[2] + warped_mask_border;
     merge(w_ch,warped_template);
   }
   
@@ -193,7 +193,7 @@ public:
     }
 
     fval += lambda_W * norm( w_est - w0 ,NORM_L1) + lambda_T * norm(T_est-T0,NORM_L1); // regularize
-    fval += lambda_F * sqrt( pow( f_est - f0, 2.0 ) );
+    fval += lambda_F * abs( f_est - f0 );
     return fval;
   }
   
@@ -231,20 +231,20 @@ public:
   }
   virtual std::vector<double> ub() const
   {
-    double c[6] = {CV_PI / 6, CV_PI / 6, CV_PI/6, 0.2, 0.2, 0.2  };
-    for( int k = 0; k < 6; k++ ) {
+    double c[7] = {CV_PI / 6, CV_PI / 6, CV_PI/6, 0.2, 0.2, 0.2, 20.0 };
+    for( int k = 0; k < 7; k++ ) {
       c[k] += xg_input[k];
     }
-    return std::vector<double>(c,c+6);
+    return std::vector<double>(c,c+7);
   }
   
   virtual std::vector<double> lb() const
   {
-    double c[6] = {-CV_PI / 6, -CV_PI / 6, -CV_PI/6, -0.2, -0.2, -0.2  };
-    for( int k = 0; k < 6; k++ ) {
+    double c[7] = {-CV_PI / 6, -CV_PI / 6, -CV_PI/6, -0.2, -0.2, -0.2, -20.0 };
+    for( int k = 0; k < 7; k++ ) {
       c[k] += xg_input[k];
     }
-    return std::vector<double>(c,c+6);
+    return std::vector<double>(c,c+7);
   }
   
   void applyPerspectiveWarp( )
@@ -320,16 +320,17 @@ public:
     input_img    = data[1].clone();
     template_img = data[2].clone();
     mask_img     = data[3].clone();
-    
+    input_img.copyTo(input_img_original);
     { // setup image-proc operations
       int fz     = filterSize;
-      if( fz % 2 == 0 ) {
-        fz += 1; // must be odd or GaussianBlur fails
+      if( fz > 1 ) {
+        if( fz % 2 == 0 ) {
+          fz += 1; // must be odd or GaussianBlur fails
+        }
+        double sig = filterSize / 3.0;
+        cv::GaussianBlur( input_img.clone(), input_img, Size(fz,fz),sig,sig );
+        cv::GaussianBlur( template_img.clone(), template_img, Size(fz,fz),sig,sig );
       }
-      double sig = filterSize / 3.0;
-      cv::GaussianBlur( input_img.clone(), input_img, Size(fz,fz),sig,sig );
-      cv::GaussianBlur( template_img.clone(), template_img, Size(fz,fz),sig,sig );
-      
       cv::bitwise_and(template_img, mask_img, template_img);
       cv::cvtColor( mask_img.clone(), mask_img, CV_RGB2GRAY );
       mask_img.clone().convertTo(mask_img,CV_8U);
@@ -354,12 +355,16 @@ public:
     template_mean_rgb_out = cv::mean(template_img,mask_img_not);
     
     // create border mask for display
-    int borderSize = (int) ( mask_img.rows / 100.0 + 0.5 );
-    cv::Canny( mask_img, mask_border, 0, 1 );
-    mask_border_narrow = mask_border.clone();
-    mask_border = mask_border*(borderSize);
+    int borderSize = (int) ( mask_img.rows / 100.0 + 0.5 ); 
+    borderSize    += ( borderSize % 2 == 0 );
+    borderSize     = std::max( 5, borderSize );
+    cv::Canny( mask_img, mask_border, 1, 2 );
+    mask_border = mask_border * borderSize * 2;
     cv::GaussianBlur(mask_border.clone(), mask_border, Size(borderSize,borderSize),3.0,3.0);
-    cv::GaussianBlur(mask_border_narrow.clone(), mask_border_narrow, Size(3,3),1.0,1.0);
+    cv::Canny( mask_border, mask_border_narrow, 1, 2 );
+    cv::GaussianBlur(mask_border_narrow.clone(), mask_border_narrow, 
+                              Size(borderSize-2,borderSize-2),2.0,2.0);
+    mask_border = mask_border - mask_border_narrow;
     
     cout << "verbosity level is: " << verbosity << endl;
     if( verbosity > 0 ) {
@@ -434,19 +439,20 @@ public:
       }
     }
     
-    xg_input = vector<float>(6,0);
-    w0 = Mat::zeros(3,1,CV_64F);
-    T0 = Mat::zeros(3,1,CV_64F);
-    T0.at<double>(2) = -0.2; // negative: further away than template
-    f0 = K.at<float>(0,0); 
-    if( opts.guess_initial.size() >= 3 ) {
+    xg_input = vector<float>(7,0.0);
+    w0          = Mat::zeros(3,1,CV_64F);
+    T0          = Mat::zeros(3,1,CV_64F);
+    xg_input[5] = 0.0; // negative: further away than template
+    xg_input[6] = K.at<float>(0,0); 
+    if( opts.guess_initial.size() >= 3 ) { // read from arg if it exists
       load_RT_from_csv( opts.guess_initial, xg_input );
-      for( int k = 0; k < 3; k++ ) {
-        w0.at<double>(k) = xg_input[k];
-        T0.at<double>(k) = xg_input[k+3];
-      }
-      f0 = xg_input[6];
     }
+    for( int k = 0; k < 3; k++ ) { // store w0,T0,f0 for regularizer costs later 
+      w0.at<double>(k) = xg_input[k];
+      T0.at<double>(k) = xg_input[k+3];
+    }
+    f0 = xg_input[6];
+  
     cout << "x0 = " << endl << Mat(xg_input) << endl;
     
     verbosity     = opts.verbosity;
@@ -479,7 +485,8 @@ public:
   Mat mask_img;
   Mat mask_border;
   Mat mask_border_narrow;
-  Mat input_img;
+  Mat input_img; // gets blurred for image processing convergence 
+  Mat input_img_original;  // for final display 
   Mat warped_template; // warp template to match input
   Mat warped_mask_border;
   Mat warped_mask_border_narrow;

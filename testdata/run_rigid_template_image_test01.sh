@@ -11,7 +11,9 @@ fi
 
 # assume that the 'bin' folder for nlmagick is in your path
 
-# nominal template 
-template_image_zoom_rigid  -K camera_droidx_640x480.yml  -i image_0001.jpg  -m image_mask.jpg  -t image_0000.jpg -a NLOPT_LN_BOBYQA -w warped01blur1.jpg -s 25 -f blurredAnswer1.out  
+template_image_rigid  -K camera_droidx_640x480.yml  -i image_0001.jpg  -m image_mask.jpg  -t image_0000.jpg -a NLOPT_LN_BOBYQA -w warped01blur1.jpg -s 25 -f blurredAnswer1.out  
+
+
+template_image_zoom_rigid  -K camera_droidx_640x480.yml  -i image_0001.jpg  -m image_mask.jpg  -t image_0000.jpg -a NLOPT_LN_BOBYQA -w warped01blur1f.jpg -s 25 -f blurredAnswer1f.out  
 
 

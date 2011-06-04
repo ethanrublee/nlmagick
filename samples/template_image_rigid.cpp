@@ -432,17 +432,18 @@ public:
       }
     }
     
-    xg_input = vector<float>(6,0);
+    xg_input = vector<float>(6,0.0);
     w0 = Mat::zeros(3,1,CV_64F);
     T0 = Mat::zeros(3,1,CV_64F);
-    T0.at<double>(2) = -0.4;
+    xg_input[5]      = 0.0;
     if( opts.guess_initial.size() >= 3 ) {
-      load_RT_from_csv( opts.guess_initial, xg_input );
-      for( int k = 0; k < 3; k++ ) {
+      load_RT_from_csv( opts.guess_initial, xg_input ); 
+    }
+    for( int k = 0; k < 3; k++ ) {
         w0.at<double>(k) = xg_input[k];
         T0.at<double>(k) = xg_input[k+3];
-      }
     }
+    
     cout << "x0 = " << endl << Mat(xg_input) << endl;
     
     verbosity     = opts.verbosity;
