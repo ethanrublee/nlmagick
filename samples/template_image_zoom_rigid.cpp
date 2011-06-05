@@ -32,6 +32,7 @@ namespace {
     string lambdaT; // regularizer for translation
     string lambdaW; // regularizer for rotation
     string lambdaF; // regularizer for f-scale change (zoom)
+    string lambdaZ; // regularizer for z depth
     string alphaIO; // weight for inside-outside disparity
     string alphaIT; // weight for inside-template similarity
 
@@ -84,6 +85,8 @@ po::value<string>(&opts.k_file)->default_value(""),
 "W regularizer weight")(
 "lambdaF,Z", po::value<string>(&opts.lambdaF)->default_value("0.1"),
 "f-scale regularizer weight")(
+"lambdaZ,E", po::value<string>(&opts.lambdaZ)->default_value("0.1"),
+"depth regularizer weight")(
 "alphaIO,C", po::value<string>(&opts.alphaIO)->default_value("0.1"),
 "chan-vese-like weight, in/out disparity")(
 "alphaIT,D", po::value<string>(&opts.alphaIT)->default_value("0.1"),
@@ -194,6 +197,7 @@ public:
 
     fval += lambda_W * norm( w_est - w0 ,NORM_L1) + lambda_T * norm(T_est-T0,NORM_L1); // regularize
     fval += lambda_F * abs( f_est - f0 );
+    fval += lambda_Z * abs( T_est.at<double>(2) );
     return fval;
   }
   
@@ -447,6 +451,7 @@ public:
     if( opts.guess_initial.size() >= 3 ) { // read from arg if it exists
       load_RT_from_csv( opts.guess_initial, xg_input );
     }
+   
     for( int k = 0; k < 3; k++ ) { // store w0,T0,f0 for regularizer costs later 
       w0.at<double>(k) = xg_input[k];
       T0.at<double>(k) = xg_input[k+3];
@@ -465,6 +470,7 @@ public:
     lambda_T       = boost::lexical_cast<double>(opts.lambdaT); 
     lambda_W       = boost::lexical_cast<double>(opts.lambdaW);
     lambda_F       = boost::lexical_cast<double>(opts.lambdaF);
+    lambda_Z       = boost::lexical_cast<double>(opts.lambdaZ);
     alpha_in_out   = boost::lexical_cast<double>(opts.alphaIO);
     alpha_template = boost::lexical_cast<double>(opts.alphaIT);
     printf("regularizers: %f, %f, %f, %f \n",lambda_T,lambda_W,alpha_in_out,alpha_template);
@@ -474,7 +480,7 @@ public:
 public:
   // some internal persistent data
   
-  double lambda_T, lambda_W, lambda_F, alpha_in_out, alpha_template;
+  double lambda_T, lambda_W, lambda_F, lambda_Z, alpha_in_out, alpha_template;
 
   double fval_best;
   int iters,verbosity,filterSize;
@@ -549,6 +555,7 @@ int main(int argc, char** argv) {
   
   // evaluate body count
   vector<double> optimal_W_and_T = opt_core.getOptimalVector();
+  
   printBodyCount(opt_core);
   RigidTransformFitter::write_RT_to_csv( opts.x_out_final, optimal_W_and_T );
   RT->writeImageCallback(opts.out_warp_img);
