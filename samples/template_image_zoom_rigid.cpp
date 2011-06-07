@@ -177,6 +177,23 @@ public:
     T_est_float.at<float>(2) +=  1.0;
     poseDrawer(outimg, K, w_est_float, T_est_float);
     imwrite( warpname, outimg );
+
+    // write the warped mask
+    outimg = warped_mask.clone();
+    outimg.convertTo(outimg,CV_8UC3);
+    imwrite( "mask_" + warpname + ".png", outimg);
+
+    // write a de-rotated mask
+    w_est = 0 * w_est;
+    T_est.convertTo(T_est_float,CV_32F);
+    w_est.convertTo(w_est_float,CV_32F);
+    f_est_float = (float) f_est;
+    Rodrigues(w_est_float, R_est); //get a rotation matrix
+    applyPerspectiveWarp();
+    outimg = warped_mask.clone();
+    outimg.convertTo(outimg,CV_8UC3);
+    imwrite( "derotated_mask_" + warpname + ".png", outimg);
+
   }
   double evalCostFuncBasic( ) {
     double fval = 0.0;
