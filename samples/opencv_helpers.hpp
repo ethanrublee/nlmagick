@@ -48,7 +48,8 @@ inline bool readKfromCalib(cv::Mat& K, cv::Mat& distortion, cv::Size & img_size,
 }
 
 inline void poseDrawer(cv::Mat& drawImage, const cv::Mat& K, 
-                       const cv::Mat& w, const cv::Mat& t, const std::string scaleText = std::string(""))
+                       const cv::Mat& w, const cv::Mat& t, 
+                       const std::string scaleText = std::string(""), int lineThickness=4)
 {
   using namespace cv;
   Point3f z(0, 0, 0.25);
@@ -66,15 +67,17 @@ inline void poseDrawer(cv::Mat& drawImage, const cv::Mat& K,
   ip[1] = ip[0] + (ip[1]- ip[0] ) * ( axes_sz / norm( ip[1] - ip[0] ) );
   ip[2] = ip[0] + (-ip[2]+ip[0] ) * ( axes_sz / norm( ip[2] - ip[0] ) );
   ip[3] = ip[0] + (-ip[3]+ip[0] ) * ( (1.0/sqrt(2))*axes_sz / ( zmin + norm( ip[3] - ip[0] ) ) );
-  
+
+
+  // DRAW AXES LINES  
   vector<Scalar> c(4); //colors
   c[0] = Scalar(255, 255, 255);
-  c[1] = Scalar(255, 0, 50);//x
+  c[1] = Scalar(205, 50, 50);//x
   c[2] = Scalar(100, 200, 0);//y
-  c[3] = Scalar(200, 100, 255);//z
-  line(drawImage, ip[0], ip[1], c[1],3,CV_AA);
-  line(drawImage, ip[0], ip[2], c[2],3,CV_AA);
-  line(drawImage, ip[0], ip[3], c[3],3,CV_AA);
+  c[3] = Scalar(200, 100, 205);//z
+  line(drawImage, ip[0], ip[1], c[1],lineThickness,CV_AA);
+  line(drawImage, ip[0], ip[2], c[2],lineThickness,CV_AA);
+  line(drawImage, ip[0], ip[3], c[3],lineThickness,CV_AA);
  
   if( scaleText.size() > 1 ) 
   { // print some text on the image if desired
@@ -84,8 +87,13 @@ inline void poseDrawer(cv::Mat& drawImage, const cv::Mat& K,
               Point(10, 30) + Point(sz.width, -sz.height - 5), Scalar::all(0), -1);
     putText(drawImage, scaleText, Point(10, 30), CV_FONT_HERSHEY_SIMPLEX, 1.0, c[0], 1, CV_AA, false);
   }
-  putText(drawImage, "Z", ip[3], CV_FONT_HERSHEY_SIMPLEX, 1.0, c[3], 3, CV_AA, false);
-  putText(drawImage, "Y", ip[2], CV_FONT_HERSHEY_SIMPLEX, 1.0, c[2], 3, CV_AA, false);
-  putText(drawImage, "X", ip[1], CV_FONT_HERSHEY_SIMPLEX, 1.0, c[1], 3, CV_AA, false);
+  
+  // DRAW LETTERS FOR AXES 
+  c[1] += Scalar(50,50,50);
+  c[2] += Scalar(50,50,50);
+  c[3] += Scalar(50,50,50);
+  putText(drawImage, "Z", ip[3], CV_FONT_HERSHEY_SIMPLEX, 1.0, c[3], lineThickness, CV_AA, false);
+  putText(drawImage, "Y", ip[2], CV_FONT_HERSHEY_SIMPLEX, 1.0, c[2], lineThickness, CV_AA, false);
+  putText(drawImage, "X", ip[1], CV_FONT_HERSHEY_SIMPLEX, 1.0, c[1], lineThickness, CV_AA, false);
 
 }

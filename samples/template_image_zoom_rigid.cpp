@@ -494,6 +494,12 @@ public:
     cout << endl;
   }
   
+  void restoreOriginalInput()
+  {
+    input_img_original.copyTo(input_img); // restore the non-blurred one
+    split( input_img, i_ch ); // rgb of input image
+  }
+  
 public:
   // some internal persistent data
   
@@ -575,6 +581,8 @@ int main(int argc, char** argv) {
   
   printBodyCount(opt_core);
   RigidTransformFitter::write_RT_to_csv( opts.x_out_final, optimal_W_and_T );
+  
+  RT->restoreOriginalInput();
   RT->writeImageCallback(opts.out_warp_img);
   waitKey(5);
   cout << "DONE." << endl;

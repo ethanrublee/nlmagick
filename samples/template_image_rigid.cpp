@@ -39,6 +39,7 @@ namespace {
     int vid;        // /dev/videoN
     int verbosity;  // how much crap to display
     int waitKeyLength;
+    int lineThick; 
     
     
   };
@@ -87,7 +88,9 @@ po::value<string>(&opts.focal_ratio)->default_value("0.0"),
 "alphaIO,C", po::value<string>(&opts.alphaIO)->default_value("0.1"),
 "chan-vese-like weight, in/out disparity")(
 "alphaIT,D", po::value<string>(&opts.alphaIT)->default_value("0.1"),
-"reverse chan-vese-like weight, in/in-template similarity");
+"reverse chan-vese-like weight, in/in-template similarity")(
+"linethickness,L", po::value<int>(&opts.lineThick)->default_value(4),
+"thickness of axes lines in display");
     
     po::variables_map vm;
     po::store(po::parse_command_line(ac, av, desc), vm);
@@ -133,9 +136,9 @@ public:
   
   void displayOnWarpedTemplate( )
   {
-    w_ch[2] = i_ch[2] + warped_mask_border_narrow + warped_mask_border;
-    w_ch[1] = i_ch[1] + warped_mask_border;
     w_ch[0] = i_ch[0] + warped_mask_border;
+    w_ch[1] = i_ch[1] + warped_mask_border_narrow;
+    w_ch[2] = i_ch[2] + warped_mask_border;
     merge(w_ch,warped_template);
   }
   
@@ -150,7 +153,7 @@ public:
     T_est_float.at<float>(2) +=  1.0;
     stringstream ss;
     ss << "F(x) = " << setprecision(4) << fval_best << ", N-iter = " << iters;
-    poseDrawer(warped_template, K, w_est_float, T_est_float, ss.str() );
+    poseDrawer(warped_template, K, w_est_float, T_est_float, ss.str(), input_opts.lineThick );
     
     imshow("warped_template",warped_template);
     if( !solver_prefix.empty() ) {
@@ -172,8 +175,23 @@ public:
     outimg.convertTo(outimg,CV_8UC3);
     
     T_est_float.at<float>(2) +=  1.0;
-    poseDrawer(outimg, K, w_est_float, T_est_float);
+    poseDrawer(outimg, K, w_est_float, T_est_float,"",input_opts.lineThick);
     imwrite( warpname, outimg );
+
+    // write the warped mask
+    outimg = warped_mask.clone();
+    outimg.convertTo(outimg,CV_8UC3);
+    imwrite( "mask_" + warpname + ".png", outimg);
+
+    // write a de-rotated mask
+    w_est = 0 * w_est;
+    T_est.convertTo(T_est_float,CV_32F);
+    w_est.convertTo(w_est_float,CV_32F);
+    Rodrigues(w_est_float, R_est); //get a rotation matrix
+    applyPerspectiveWarp();
+    outimg = warped_mask.clone();
+    outimg.convertTo(outimg,CV_8UC3);
+    imwrite( "derotated_mask_" + warpname + ".png", outimg);
   }
   double evalCostFuncBasic( ) {
     double fval = 0.0;
@@ -305,21 +323,22 @@ public:
   }
   void setup(const vector<Mat>& data) {
     
-    // what we're allowed to see: image points and calibration K matrix
+   // what we're allowed to see: image points and calibration K matrix
     K = data[0].clone();
     input_img    = data[1].clone();
     template_img = data[2].clone();
     mask_img     = data[3].clone();
-    
+    input_img.copyTo(input_img_original);
     { // setup image-proc operations
       int fz     = filterSize;
-      if( fz % 2 == 0 ) {
-        fz += 1; // must be odd or GaussianBlur fails
+      if( fz > 1 ) {
+        if( fz % 2 == 0 ) {
+          fz += 1; // must be odd or GaussianBlur fails
+        }
+        double sig = filterSize / 3.0;
+        cv::GaussianBlur( input_img.clone(), input_img, Size(fz,fz),sig,sig );
+        cv::GaussianBlur( template_img.clone(), template_img, Size(fz,fz),sig,sig );
       }
-      double sig = filterSize / 3.0;
-      cv::GaussianBlur( input_img.clone(), input_img, Size(fz,fz),sig,sig );
-      cv::GaussianBlur( template_img.clone(), template_img, Size(fz,fz),sig,sig );
-      
       cv::bitwise_and(template_img, mask_img, template_img);
       cv::cvtColor( mask_img.clone(), mask_img, CV_RGB2GRAY );
       mask_img.clone().convertTo(mask_img,CV_8U);
@@ -344,12 +363,16 @@ public:
     template_mean_rgb_out = cv::mean(template_img,mask_img_not);
     
     // create border mask for display
-    int borderSize = (int) ( mask_img.rows / 100.0 + 0.5 );
-    cv::Canny( mask_img, mask_border, 0, 1 );
-    mask_border_narrow = mask_border.clone();
-    mask_border = mask_border*(borderSize);
+    int borderSize = (int) ( mask_img.rows / 100.0 + 0.5 ); 
+    borderSize    += ( borderSize % 2 == 0 );
+    borderSize     = std::max( 5, borderSize );
+    cv::Canny( mask_img, mask_border, 1, 2 );
+    mask_border = mask_border * borderSize * 2;
     cv::GaussianBlur(mask_border.clone(), mask_border, Size(borderSize,borderSize),3.0,3.0);
-    cv::GaussianBlur(mask_border_narrow.clone(), mask_border_narrow, Size(3,3),1.0,1.0);
+    cv::Canny( mask_border, mask_border_narrow, 1, 2 );
+    cv::GaussianBlur(mask_border_narrow.clone(), mask_border_narrow, 
+                              Size(borderSize-2,borderSize-2),2.0,2.0);
+    mask_border = mask_border - mask_border_narrow;
     
     cout << "verbosity level is: " << verbosity << endl;
     if( verbosity > 0 ) {
@@ -461,6 +484,12 @@ public:
     cout << endl;
   }
   
+  void restoreOriginalInput()
+  {
+    input_img_original.copyTo(input_img); // restore the non-blurred one
+    split( input_img, i_ch ); // rgb of input image
+  }
+  
 public:
   // some internal persistent data
   
@@ -470,12 +499,15 @@ public:
   int iters,verbosity,filterSize;
   
   Mat K; //camera matrix
+  
   Mat template_img;
-  Mat weighted_mask; // TODO: weight the mask by this ... less at the edges!
   Mat mask_img;
   Mat mask_border;
   Mat mask_border_narrow;
-  Mat input_img;
+  
+  Mat input_img;           // the "query", gets blurred though 
+  Mat input_img_original;  // for final display, no blurring
+  
   Mat warped_template; // warp template to match input
   Mat warped_mask_border;
   Mat warped_mask_border_narrow;
@@ -538,6 +570,8 @@ int main(int argc, char** argv) {
   vector<double> optimal_W_and_T = opt_core.getOptimalVector();
   printBodyCount(opt_core);
   RigidTransformFitter::write_RT_to_csv( opts.x_out_final, optimal_W_and_T );
+
+  RT->restoreOriginalInput();
   RT->writeImageCallback(opts.out_warp_img);
   waitKey(5);
   cout << "DONE." << endl;
