@@ -41,7 +41,7 @@ namespace {
     int vid;        // /dev/videoN
     int verbosity;  // how much crap to display
     int waitKeyLength;
-    
+    int lineThick;
     
   };
   
@@ -90,7 +90,9 @@ po::value<string>(&opts.k_file)->default_value(""),
 "alphaIO,C", po::value<string>(&opts.alphaIO)->default_value("0.1"),
 "chan-vese-like weight, in/out disparity")(
 "alphaIT,D", po::value<string>(&opts.alphaIT)->default_value("0.1"),
-"reverse chan-vese-like weight, in/in-template similarity");
+"reverse chan-vese-like weight, in/in-template similarity")(
+"linethickness,L", po::value<int>(&opts.lineThick)->default_value(4),
+"thickness of axes lines in display");
     
     po::variables_map vm;
     po::store(po::parse_command_line(ac, av, desc), vm);
@@ -153,7 +155,7 @@ public:
     T_est_float.at<float>(2) +=  1.0;
     stringstream ss;
     ss << "F(x) = " << setprecision(4) << fval_best << ", N-iter = " << iters;
-    poseDrawer(warped_template, K, w_est_float, T_est_float, ss.str() );
+    poseDrawer(warped_template, K, w_est_float, T_est_float, ss.str(),input_opts.lineThick);
     
     imshow("warped_template",warped_template);
     if( !solver_prefix.empty() ) {
