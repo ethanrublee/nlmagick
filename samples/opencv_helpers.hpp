@@ -18,6 +18,34 @@
 #include <boost/format.hpp>
 #include <boost/lexical_cast.hpp>
 
+template<typename Type>
+void fillWeightsGaussian(cv::Mat& weights, Type sigma_squared)
+{
+  for (int y = 0; y < weights.rows; y++)
+  {
+    for (int x = 0; x < weights.cols; x++)
+    {
+      Type y_h = ((Type)y) / (weights.rows - 1.0) - 0.5;
+      Type x_h = ((Type)x) / (weights.cols - 1.0) - 0.5;
+      x_h *= 2; //x goes from -1 to 1
+      y_h *= 2; //y "" ""
+      Type val = ((x_h * x_h) + (y_h*y_h))/(2*sigma_squared);
+      val = (Type)std::exp(-val);
+      weights.at<Type> (y, x) = val;
+    }
+  }
+}
+
+void fillWeightsGaussian32(cv::Mat& weights, float sigma_squared)
+{
+  fillWeightsGaussian<float>(weights,sigma_squared);
+}
+
+void fillWeightsGaussian64(cv::Mat& weights, double sigma_squared)
+{
+  fillWeightsGaussian<double>(weights,sigma_squared);
+}
+
 inline bool readKfromCalib(cv::Mat& K, cv::Mat& distortion, cv::Size & img_size, const std::string& calibfile)
 {
   cv::FileStorage fs(calibfile, cv::FileStorage::READ);
