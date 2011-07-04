@@ -1,4 +1,4 @@
-#include <nlopt/nlopt.hpp>
+#include <nlmagick/nlopt.hpp>
 #include <iostream>
 #include <stdexcept>
 #include <sstream>

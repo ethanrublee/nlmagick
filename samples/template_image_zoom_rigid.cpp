@@ -1,6 +1,6 @@
 
 #include "opencv_helpers.hpp"
-#include <nlopt/nlopt.hpp>
+#include <nlmagick/nlopt.hpp>
 #include <omp.h>
 
 

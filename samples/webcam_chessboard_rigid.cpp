@@ -1,4 +1,4 @@
-#include <nlopt/nlopt.hpp>
+#include <nlmagick/nlopt.hpp>
 #include "opencv_helpers.hpp"
 
 using namespace cv;
