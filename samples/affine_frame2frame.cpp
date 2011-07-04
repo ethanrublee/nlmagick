@@ -1,61 +1,66 @@
 
 #include "opencv_helpers.hpp"
-#include <nlopt/nlopt.hpp>
-#include <omp.h>
-
+#include "nlopt/nlopt.hpp"
 
 using namespace cv;
 using namespace std;
 using namespace nlopt;
-
-#define foreach         BOOST_FOREACH
-#define reverse_foreach BOOST_REVERSE_FOREACH
-
 namespace po = boost::program_options;
 using boost::lexical_cast;
 
 
-namespace {
+class AffineF2F: public OptimProblem
+{
+public:
+  struct Options {
+    string k_file;
+    string focal_ratio;
+    string input_img1;
+    string input_img2;
+    string out_warp_img;
+    string algorithm;
 
-struct Options {
-  string k_file;
-  string focal_ratio;
-  string input_img1;
-  string input_img2;
-  string out_warp_img;
-  string algorithm;
+    double vx0;
+    double vy0;
+    double vmax;
+    int    verbosity;
 
-};
+  };
 
-int options(int ac, char ** av, Options& opts) {
-  // Declare the supported options.
-  po::options_description desc("Allowed options");
-  desc.add_options()("help", "Produce help message.")(
-        "inputimageA,A", po::value<string>(&opts.input_img1)->default_value(""),
-        "first image (in time)")(
-        "inputimageB,B", po::value<string>(&opts.input_img2)->default_value(""),
-        "first image (in time)")(
-        "outwarpimage,w", po::value<string>(&opts.out_warp_img)->default_value("warped.jpg"),
-        "output for warped image, from 1 to 2.")(
-        "algorithm,a", po::value<string>(&opts.algorithm)->default_value("NLOPT_LN_SBPLX"),
-        "algorithm for solver, such as NLOPT_LN_BOBYQA, NLOPT_LN_SBPLX, NLOPT_LN_COBYLA.");
+  static int options(int ac, char ** av, Options& opts) {
+    // Declare the supported options.
+    po::options_description desc("Allowed options");
+    desc.add_options()("help", "Produce help message.")(
+          "inputimageA,A", po::value<string>(&opts.input_img1)->default_value(""),
+          "first image (in time)")(
+          "inputimageB,B", po::value<string>(&opts.input_img2)->default_value(""),
+          "first image (in time)")(
+          "outwarpimage,w", po::value<string>(&opts.out_warp_img)->default_value("warped.jpg"),
+          "output for warped image, from 1 to 2.")(
+          "algorithm,a", po::value<string>(&opts.algorithm)->default_value("NLOPT_LN_SBPLX"),
+          "algorithm for solver, such as NLOPT_LN_BOBYQA, NLOPT_LN_SBPLX, NLOPT_LN_COBYLA.")(
+          "vx0,x", po::value<double>(&opts.vx0)->default_value(0.0),
+          "initial guess: x-velocity")(
+          "vy0,y", po::value<double>(&opts.vy0)->default_value(0.0),
+          "initial guess: v-velocity")(
+          "vmax,m", po::value<double>(&opts.vmax)->default_value(100.0),
+          "max abs(...) velocity")(
+          "verbose,v", po::value<int>(&opts.verbosity)->default_value(2),
+          "verbosity, how much to display crap. between 0 and 3.");
 
-  po::variables_map vm;
-  po::store(po::parse_command_line(ac, av, desc), vm);
-  po::notify(vm);
+    po::variables_map vm;
+    po::store(po::parse_command_line(ac, av, desc), vm);
+    po::notify(vm);
 
-  if (vm.count("help")) {
-    cout << desc << "\n";
-    return 1;
+    if (vm.count("help")) {
+      cout << desc << "\n";
+      return 1;
+    }
+
+    return 0;
+
   }
 
-  return 0;
-
-}
-
-}
-
-class AffineF2F: public OptimProblem {
 public:
   AffineF2F() {
   }
@@ -70,7 +75,7 @@ public:
     stop_criteria.xtol_rel = 1e-8;
     stop_criteria.nevals   = 0;
     stop_criteria.maxeval  = 50000;
-    stop_criteria.maxtime  = 10;
+    stop_criteria.maxtime  = 5;
     stop_criteria.start    = 0.0;
     stop_criteria.force_stop = 0;
     stop_criteria.minf_max   = 1e9;
@@ -104,7 +109,7 @@ public:
     }
 
     iters++;
-    if( fval < fval_best )
+    if( (input_opts.verbosity >= 1) && fval < fval_best )
     {
       cout << "dx = " << dx << ", dy = " << dy << ", fval = "
            << fval << ", iters = " << iters << endl;
@@ -118,13 +123,13 @@ public:
   }
   virtual std::vector<double> ub() const
   {
-    double c[2] = { 60.0,60.0 };
+    double c[2] = { input_opts.vmax+input_opts.vx0,input_opts.vmax+input_opts.vy0};
     return std::vector<double>(c,c+2);
   }
 
   virtual std::vector<double> lb() const
   {
-    double c[2] = { -60.0,-60.0 };
+    double c[2] = { -input_opts.vmax+input_opts.vx0,-input_opts.vmax+input_opts.vy0};
     return std::vector<double>(c,c+2);
   }
 
@@ -142,12 +147,12 @@ public:
 
   virtual OptimAlgorithm getAlgorithm() const {
     //http://ab-initio.mit.edu/wiki/index.php/NLopt_Algorithms
-    if( algorithm.compare("NLOPT_LN_SBPLX") == 0 )
+    if( input_opts.algorithm.compare("NLOPT_LN_SBPLX") == 0 )
       return NLOPT_LN_SBPLX;
-    if( algorithm.compare("NLOPT_LN_COBYLA") == 0 ) {
+    if( input_opts.algorithm.compare("NLOPT_LN_COBYLA") == 0 ) {
       return NLOPT_LN_COBYLA;
     }
-    if( algorithm.compare("NLOPT_LN_BOBYQA") == 0 ) {
+    if( input_opts.algorithm.compare("NLOPT_LN_BOBYQA") == 0 ) {
       return NLOPT_LN_BOBYQA;
     }
     cout << "warning, algorithm string is bogus. using default..." << endl;
@@ -156,12 +161,14 @@ public:
 
   virtual std::vector<double> Xinit() const
   {
-    std::vector<double> x0 = std::vector<double>(N(), 0.0);
+    std::vector<double> x0 = std::vector<double>(2, 0.0);
+    x0[0] += input_opts.vx0;
+    x0[1] += input_opts.vy0;
     return x0;
   }
 
   void setup( const Options& opts ) {
-    algorithm = opts.algorithm;
+    input_opts = opts;
     Mat img1 = imread(opts.input_img1);
     Mat img2 = imread(opts.input_img2);
     img1.convertTo(input_img1,CV_64FC3,1.0/255.0);
@@ -179,13 +186,14 @@ public:
 
     fval_best = 1e9;
     iters = 0;
+
   }
 
 
 public:
   // some internal persistent data
   Options  input_opts;
-  string algorithm;
+
   Mat input_img1;
   Mat input_img2;
 
@@ -201,11 +209,9 @@ public:
 
 
 int main(int argc, char** argv) {
-  Options opts;
-  if (options(argc, argv, opts))
+  AffineF2F::Options opts;
+  if (AffineF2F::options(argc, argv, opts))
     return 1;
-
-  omp_set_num_threads(4);
 
   boost::shared_ptr<AffineF2F> RT(new AffineF2F());
   RT->setup( opts );
@@ -217,9 +223,14 @@ int main(int argc, char** argv) {
   opt_core.optimize();
 
   // evaluate body count
+
   vector<double> optimal_vxvy = opt_core.getOptimalVector();
-  imwrite(opts.out_warp_img,RT->warped_best);
-  cout << "DONE." << endl;
+  if( RT->input_opts.verbosity >= 1 ) {
+    imwrite(opts.out_warp_img,RT->warped_best);
+    cout << "DONE." << endl;
+  }
+  cout << Mat(optimal_vxvy) << ";" << endl;
   return 0;
 
 }
+
