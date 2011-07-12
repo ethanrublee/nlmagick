@@ -80,9 +80,9 @@ inline void poseDrawer(cv::Mat& drawImage, const cv::Mat& K,
                        const std::string scaleText = std::string(""), int lineThickness=4)
 {
   using namespace cv;
-  Point3f z(0, 0, 0.25);
+  Point3f z(0, 0, -0.25);
   Point3f x(0.25, 0, 0);
-  Point3f y(0, 0.25, 0);
+  Point3f y(0, -0.25, 0);
   Point3f o(0, 0, 0);
   vector<Point3f> op(4);
   op[1] = x, op[2] = y, op[3] = z, op[0] = o;
@@ -92,10 +92,12 @@ inline void poseDrawer(cv::Mat& drawImage, const cv::Mat& K,
   projectPoints(Mat(op), w, t, K, D, ip);
   double axes_sz = drawImage.rows / 4.0;
   double zmin    = 5e-2; 
-  ip[1] = ip[0] + (ip[1]- ip[0] ) * ( axes_sz / norm( ip[1] - ip[0] ) );
-  ip[2] = ip[0] + (-ip[2]+ip[0] ) * ( axes_sz / norm( ip[2] - ip[0] ) );
-  ip[3] = ip[0] + (-ip[3]+ip[0] ) * ( (1.0/sqrt(2))*axes_sz / ( zmin + norm( ip[3] - ip[0] ) ) );
-
+//  ip[1] = ip[0] + (ip[1]- ip[0] ) * ( axes_sz / norm( ip[1] - ip[0] ) );
+//  ip[2] = ip[0] + (-ip[2]+ip[0] ) * ( axes_sz / norm( ip[2] - ip[0] ) );
+//  ip[3] = ip[0] + (-ip[3]+ip[0] ) * ( (1.0/sqrt(2))*axes_sz / ( zmin + norm( ip[3] - ip[0] ) ) );
+  ip[1] = ip[0] + (ip[1]-ip[0] ) * ( axes_sz / norm( ip[1] - ip[0] ) );
+  ip[2] = ip[0] + (ip[2]-ip[0] ) * ( axes_sz / norm( ip[2] - ip[0] ) );
+  ip[3] = ip[0] + (ip[3]-ip[0] ) * ( (1.0/sqrt(2))*axes_sz / ( zmin + norm( ip[3] - ip[0] ) ) );
 
   // DRAW AXES LINES  
   vector<Scalar> c(4); //colors
