@@ -1,8 +1,4 @@
-#ifndef NLOPT_HPP
-#define NLOPT_HPP
-
-#include "nlopt.h"
-
+#pragma once
 #include <vector>
 #include <stdexcept>
 #include <new>
@@ -12,7 +8,7 @@
 #include <vector>
 #include <boost/shared_ptr.hpp>
 
-namespace nlopt
+namespace nlopt //TODO rename to nlmagick
 {
 
 /** \brief  Enumeration of available algorithms.
@@ -24,9 +20,113 @@ namespace nlopt
  * "NOSCAL" Suffix: algorithm *not* scaled to a unit hypercube
  (i.e. sensitive to the units of x)
  */
-typedef nlopt_algorithm OptimAlgorithm;
-typedef nlopt_result OptimResult;
-typedef nlopt_stopping OptimStopCriteria;
+//typedef nlopt_algorithm OptimAlgorithm;
+enum OptimAlgorithm
+{
+     /* Naming conventions:
+
+        NLOPT_{G/L}{D/N}_*
+        = global/local derivative/no-derivative optimization,
+              respectively
+
+    *_RAND algorithms involve some randomization.
+
+    *_NOSCAL algorithms are *not* scaled to a unit hypercube
+             (i.e. they are sensitive to the units of x)
+    */
+
+     NLOPT_GN_DIRECT = 0,
+     NLOPT_GN_DIRECT_L,
+     NLOPT_GN_DIRECT_L_RAND,
+     NLOPT_GN_DIRECT_NOSCAL,
+     NLOPT_GN_DIRECT_L_NOSCAL,
+     NLOPT_GN_DIRECT_L_RAND_NOSCAL,
+
+     NLOPT_GN_ORIG_DIRECT,
+     NLOPT_GN_ORIG_DIRECT_L,
+
+     NLOPT_GD_STOGO,
+     NLOPT_GD_STOGO_RAND,
+
+     NLOPT_LD_LBFGS_NOCEDAL,
+
+     NLOPT_LD_LBFGS,
+
+     NLOPT_LN_PRAXIS,
+
+     NLOPT_LD_VAR1,
+     NLOPT_LD_VAR2,
+
+     NLOPT_LD_TNEWTON,
+     NLOPT_LD_TNEWTON_RESTART,
+     NLOPT_LD_TNEWTON_PRECOND,
+     NLOPT_LD_TNEWTON_PRECOND_RESTART,
+
+     NLOPT_GN_CRS2_LM,
+
+     NLOPT_GN_MLSL,
+     NLOPT_GD_MLSL,
+     NLOPT_GN_MLSL_LDS,
+     NLOPT_GD_MLSL_LDS,
+
+     NLOPT_LD_MMA,
+
+     NLOPT_LN_COBYLA,
+
+     NLOPT_LN_NEWUOA,
+     NLOPT_LN_NEWUOA_BOUND,
+
+     NLOPT_LN_NELDERMEAD,
+     NLOPT_LN_SBPLX,
+
+     NLOPT_LN_AUGLAG,
+     NLOPT_LD_AUGLAG,
+     NLOPT_LN_AUGLAG_EQ,
+     NLOPT_LD_AUGLAG_EQ,
+
+     NLOPT_LN_BOBYQA,
+
+     NLOPT_GN_ISRES,
+
+     /* new variants that require local_optimizer to be set,
+    not with older constants for backwards compatibility */
+     NLOPT_AUGLAG,
+     NLOPT_AUGLAG_EQ,
+     NLOPT_G_MLSL,
+     NLOPT_G_MLSL_LDS,
+
+     NLOPT_LD_SLSQP,
+
+     NLOPT_NUM_ALGORITHMS /* not an algorithm, just the number of them */
+};
+//typedef nlopt_result OptimResult;
+enum OptimResult
+{
+     NLOPT_FAILURE = -1, /* generic failure code */
+     NLOPT_INVALID_ARGS = -2,
+     NLOPT_OUT_OF_MEMORY = -3,
+     NLOPT_ROUNDOFF_LIMITED = -4,
+     NLOPT_FORCED_STOP = -5,
+     NLOPT_SUCCESS = 1, /* generic success code */
+     NLOPT_STOPVAL_REACHED = 2,
+     NLOPT_FTOL_REACHED = 3,
+     NLOPT_XTOL_REACHED = 4,
+     NLOPT_MAXEVAL_REACHED = 5,
+     NLOPT_MAXTIME_REACHED = 6
+};
+//typedef nlopt_stopping OptimStopCriteria;
+struct OptimStopCriteria
+{
+     unsigned n;
+     double minf_max;
+     double ftol_rel;
+     double ftol_abs;
+     double xtol_rel;
+     const double *xtol_abs;
+     int nevals, maxeval;
+     double maxtime, start;
+     int *force_stop;
+};
 
 /** Client interface for using the optimization framework.
  * User must atleast implement:
@@ -205,4 +305,3 @@ void printOptimResult( OptimResult result );
 
 } // End Namespace nlopt
 
-#endif
