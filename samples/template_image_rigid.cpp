@@ -174,6 +174,10 @@ public:
     Mat outimg = warped_template.clone();
     outimg.convertTo(outimg,CV_8UC3);
     
+    for( int i=1;i<=2;i++) {
+//     T_est_float.at<float>(i) *= -1.0;
+//     w_est_float.at<float>(i) *= -1.0;
+    }
     T_est_float.at<float>(2) +=  1.0;
     poseDrawer(outimg, K, w_est_float, T_est_float,"",input_opts.lineThick);
     imwrite( warpname, outimg );
@@ -221,10 +225,7 @@ public:
     iters++;
     memcpy(w_est.data, X, 3 * sizeof(double));
     memcpy(T_est.data, X + 3, 3 * sizeof(double));
-    T_est.convertTo(T_est_float,CV_32F);
-    w_est.convertTo(w_est_float,CV_32F);
-    Rodrigues(w_est_float, R_est); //get a rotation matrix
-    
+
     applyPerspectiveWarp();
     double fval = evalCostFuncBasic();
     
@@ -245,7 +246,7 @@ public:
   }
   virtual std::vector<double> ub() const
   {
-    double c[6] = {CV_PI / 6, CV_PI / 6, CV_PI/6, 0.2, 0.2, 0.2  };
+    double c[6] = {CV_PI / 3, CV_PI / 3, CV_PI/2, 0.2, 0.2, 1.0  };
     for( int k = 0; k < 6; k++ ) {
       c[k] += xg_input[k];
     }
@@ -254,7 +255,7 @@ public:
   
   virtual std::vector<double> lb() const
   {
-    double c[6] = {-CV_PI / 6, -CV_PI / 6, -CV_PI/6, -0.2, -0.2, -0.2  };
+    double c[6] = {-CV_PI / 3, -CV_PI / 3, -CV_PI/2, -0.2, -0.2, -1.0  };
     for( int k = 0; k < 6; k++ ) {
       c[k] += xg_input[k];
     }
@@ -263,6 +264,14 @@ public:
   
   void applyPerspectiveWarp( )
   {
+    for( int i=1;i<=2;i++) {
+//     T_est.at<double>(i) *= -1.0;
+//     w_est.at<double>(i) *= -1.0;
+    }
+    T_est.convertTo(T_est_float,CV_32F);
+    w_est.convertTo(w_est_float,CV_32F);
+    Rodrigues(w_est_float, R_est); //get a rotation matrix
+
     // Rotation
     double r11 = R_est.at<float>(0,0);        double r12 = R_est.at<float>(0,1);
     double r21 = R_est.at<float>(1,0);        double r22 = R_est.at<float>(1,1);
@@ -271,11 +280,11 @@ public:
     // Translation
     double tx  = T_est.at<double>(0);
     double ty  = T_est.at<double>(1);
-    double tz  = T_est.at<double>(2);
+    double tz  = std::max(1.0 + T_est.at<double>(2),0.2);
     
     H_est.at<float>(0,0) = r11; H_est.at<float>(0,1) = r12; H_est.at<float>(0,2) = tx;
     H_est.at<float>(1,0) = r21; H_est.at<float>(1,1) = r22; H_est.at<float>(1,2) = ty;
-    H_est.at<float>(2,0) = r31; H_est.at<float>(2,1) = r32; H_est.at<float>(2,2) = 1.0+tz;
+    H_est.at<float>(2,0) = r31; H_est.at<float>(2,1) = r32; H_est.at<float>(2,2) = tz;
     
     H_est =  (K * H_est * K.inv());
     int nthreads, tid;
