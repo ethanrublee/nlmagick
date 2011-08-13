@@ -19,6 +19,7 @@ public:
     string input_img2;
     string out_warp_img;
     string algorithm;
+    string directory;
 
     double vx0;
     double vy0;
@@ -31,6 +32,8 @@ public:
     // Declare the supported options.
     po::options_description desc("Allowed options");
     desc.add_options()("help", "Produce help message.")(
+          "imageDirectory,d", po::value<string>(&opts.directory)->default_value(""),
+          "directory of jpeg images. overrides input A,B. ")(
           "inputimageA,A", po::value<string>(&opts.input_img1)->default_value(""),
           "first image (in time)")(
           "inputimageB,B", po::value<string>(&opts.input_img2)->default_value(""),
@@ -212,6 +215,15 @@ int main(int argc, char** argv) {
   AffineF2F::Options opts;
   if (AffineF2F::options(argc, argv, opts))
     return 1;
+
+  vector<string> jpegList;
+  if( !opts.directory.empty() ) {
+    lsFilesOfType(opts.directory.c_str(),".jpg",jpegList);
+  } else {
+    jpegList.push_back(opts.input_img1);
+    jpegList.push_back(opts.input_img2);
+  }
+
 
   boost::shared_ptr<AffineF2F> RT(new AffineF2F());
   RT->setup( opts );

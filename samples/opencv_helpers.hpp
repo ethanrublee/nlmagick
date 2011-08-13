@@ -5,6 +5,11 @@
 #include <string>
 #include <fstream>
 #include <iomanip>
+#include <vector>
+#include <algorithm>
+#include <sys/types.h>
+#include <dirent.h>
+
 
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
@@ -17,6 +22,9 @@
 #include <boost/filesystem.hpp>
 #include <boost/format.hpp>
 #include <boost/lexical_cast.hpp>
+
+using std::string;
+using std::vector;
 
 template<typename Type>
 void fillWeightsGaussian(cv::Mat& weights, Type sigma_squared)
@@ -126,4 +134,28 @@ inline void poseDrawer(cv::Mat& drawImage, const cv::Mat& K,
   putText(drawImage, "Y", ip[2], CV_FONT_HERSHEY_SIMPLEX, 1.0, c[2], lineThickness, CV_AA, false);
   putText(drawImage, "X", ip[1], CV_FONT_HERSHEY_SIMPLEX, 1.0, c[1], lineThickness, CV_AA, false);
 
+}
+
+
+/**  given a "dir" as string and ending extension, put name of files
+     into the vector string. vector is sorted lexicographically.
+  */
+void lsFilesOfType(const char * dir, const string& extension,
+        vector<string>& files) {
+    files.clear();
+    DIR *dp;
+    struct dirent *dirp;
+    if ((dp = opendir(dir)) == NULL) {
+        return;
+    }
+
+    while ((dirp = readdir(dp)) != NULL) {
+        std::string name(dirp->d_name);
+        size_t pos = name.find(extension);
+        if (pos != std::string::npos) {
+            files.push_back(name);
+        }
+    }
+    closedir(dp);
+    std::sort(files.begin(), files.end());
 }
