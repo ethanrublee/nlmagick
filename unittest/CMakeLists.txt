@@ -22,10 +22,10 @@ data_download(image_mask image_mask.jpg data_rigid_template)
 
 add_test(template_image_rigid 
     ${CMAKE_BINARY_DIR}/bin/template_image_rigid 
-    -K ${CMAKE_CURRENT_SOURCE_DIR}/camera_droidx_640x480.yml 
-    -i ${image_0001}
-    -m ${image_mask}
-    -t ${image_0000}
+    -K ${CMAKE_SOURCE_DIR}/testdata/camera_droidx_640x480.yml
+    -i ${CMAKE_BINARY_DIR}/data_rigid_template/image_0000.jpg
+    -m ${CMAKE_BINARY_DIR}/data_rigid_template/image_mask.jpg
+    -t ${CMAKE_BINARY_DIR}/data_rigid_template/image_0001.jpg
     -a NLOPT_LN_BOBYQA
     -w warped01blur1.jpg
     -s 25
