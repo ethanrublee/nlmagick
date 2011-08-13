@@ -2,7 +2,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <sstream>
-
+#include "nlopt.h"
 namespace nlopt
 {
 //use this to grab a pointer to the first element in a vector
@@ -80,7 +80,7 @@ struct NLOptCore::NLOptCore_impl
     if (problem == NULL)
         throw std::runtime_error("unitialized problem");
 
-    result = nlopt_optimize(problem, Vp(X), &fval);
+    result = OptimResult(nlopt_optimize(problem, Vp(X), &fval));
 
     if (result <= 0) // the math went wrong (e.g. divide by zero in objective)
     {                // probably not a programming bug
@@ -98,8 +98,8 @@ struct NLOptCore::NLOptCore_impl
     algorithm = opt->getAlgorithm(); //get the type of algorithm
     n = opt->N(); // number of variables
     if(n < 1) std::logic_error("N must not be less than 1!");
-    problem = nlopt_create(algorithm, n);
-    result = nlopt_set_min_objective(problem, &NLOptCore_impl::ObjectiveCallback, this);
+    problem = nlopt_create(nlopt_algorithm(algorithm), n);
+    result =  OptimResult(nlopt_set_min_objective(problem, &NLOptCore_impl::ObjectiveCallback, this));
     Assert( result == NLOPT_SUCCESS );
   }
 
@@ -146,15 +146,15 @@ struct NLOptCore::NLOptCore_impl
     int m_eq = tol_e.size();
     if (m_eq > 0)
     { // set tolerances for equality constraints
-      result = nlopt_add_equality_mconstraint(problem, m_eq, &NLOptCore_impl::EqualityConstraintCallback, this,
-                                              &(tol_e[0]));
+      result =  OptimResult(nlopt_add_equality_mconstraint(problem, m_eq, &NLOptCore_impl::EqualityConstraintCallback, this,
+                                              &(tol_e[0])));
       if (result != NLOPT_SUCCESS)
         std::cout << "result: " << result << std::endl;
       Assert( result == NLOPT_SUCCESS );
     }
     if (tol_ne.size() > 0)
     { // set tolerances for inequality constraints
-      result = nlopt_add_inequality_mconstraint(problem, tol_ne.size(), &NLOptCore_impl::InequalityConstraintCallback,
+      result = ( OptimResult)nlopt_add_inequality_mconstraint(problem, tol_ne.size(), &NLOptCore_impl::InequalityConstraintCallback,
                                                 this, &(tol_ne[0]));
       if (result != NLOPT_SUCCESS)
         std::cout << "result: " << result << std::endl;
@@ -163,23 +163,23 @@ struct NLOptCore::NLOptCore_impl
 
     if (lb.size() == n)
     { // set lower bound constraints on X
-      result = nlopt_set_lower_bounds(problem, Vp(lb));
+      result = ( OptimResult) nlopt_set_lower_bounds(problem, Vp(lb));
       Assert( result == NLOPT_SUCCESS );
     }
     else if (lb.size() == 1)
     {
-      result = nlopt_set_lower_bounds1(problem, lb[0]);
+      result = ( OptimResult)nlopt_set_lower_bounds1(problem, lb[0]);
       Assert( result == NLOPT_SUCCESS );
     }
 
     if (ub.size() == n)
     { // set upper bound constraints on X
-      result = nlopt_set_upper_bounds(problem, Vp(ub));
+      result = ( OptimResult)nlopt_set_upper_bounds(problem, Vp(ub));
       Assert( result == NLOPT_SUCCESS );
     }
     else if (ub.size() == 1)
     {
-      result = nlopt_set_upper_bounds1(problem, ub[0]);
+      result =( OptimResult) nlopt_set_upper_bounds1(problem, ub[0]);
       Assert( result == NLOPT_SUCCESS );
     }
 
