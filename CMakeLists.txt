@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 2.8)
 project(nlmagick)
-# search for Boost version 1.34
+
+enable_testing()
+
+# search for Boost version
 find_package( Boost COMPONENTS filesystem program_options )
 
 link_directories ( ${Boost_LIBRARY_DIRS} )
@@ -45,4 +48,6 @@ endmacro()
 define_module(nlmagick)
 
 add_subdirectory(samples)
+
+add_subdirectory(unittest)
 
