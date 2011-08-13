@@ -38,6 +38,11 @@ data_download(trees1 trees161.png data_trees_af2f)
 data_download(trees2 trees162.png data_trees_af2f)
 data_download(trees3 trees163.png data_trees_af2f)
 data_download(trees4 trees164.png data_trees_af2f)
+data_download(trees5 trees165.png data_trees_af2f)
+data_download(trees6 trees166.png data_trees_af2f)
+data_download(trees7 trees167.png data_trees_af2f)
+data_download(trees8 trees168.png data_trees_af2f)
+data_download(trees9 trees169.png data_trees_af2f)
 
 add_test(test_affineFrame2Frame
     ${CMAKE_BINARY_DIR}/bin/affine_frame2frame
