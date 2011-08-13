@@ -20,7 +20,7 @@ data_download(image_0001 image_0001.jpg data_rigid_template)
 data_download(image_0002 image_0002.jpg data_rigid_template)
 data_download(image_mask image_mask.jpg data_rigid_template)
 
-add_test(template_image_rigid 
+add_test(test_image_rigid_LinuxFlag
     ${CMAKE_BINARY_DIR}/bin/template_image_rigid 
     -K ${CMAKE_SOURCE_DIR}/testdata/camera_droidx_640x480.yml
     -i ${CMAKE_BINARY_DIR}/data_rigid_template/image_0001.jpg
@@ -39,7 +39,7 @@ data_download(trees2 trees162.png data_trees_af2f)
 data_download(trees3 trees163.png data_trees_af2f)
 data_download(trees4 trees164.png data_trees_af2f)
 
-add_test(template_image_rigid
+add_test(test_affineFrame2Frame
     ${CMAKE_BINARY_DIR}/bin/affine_frame2frame
     -d ${CMAKE_BINARY_DIR}/data_trees_af2f
     -v 1
