@@ -24,7 +24,7 @@ data_download(image_mask image_mask.jpg)
 add_test(template_image_rigid 
     ${CMAKE_BINARY_DIR}/bin/template_image_rigid 
     -K ${CMAKE_CURRENT_SOURCE_DIR}/camera_droidx_640x480.yml 
-    -i ${image_0000}
+    -i ${image_0001}
     -m ${image_mask}
     -t ${image_0000}
     -a NLOPT_LN_BOBYQA
