@@ -112,7 +112,7 @@ public:
     }
 
     iters++;
-    if( (input_opts.verbosity >= 1) && fval < fval_best )
+    if( (input_opts.verbosity >= 3) && fval < fval_best )
     {
       cout << "dx = " << dx << ", dy = " << dy << ", fval = "
            << fval << ", iters = " << iters << endl;
@@ -216,32 +216,72 @@ int main(int argc, char** argv) {
   if (AffineF2F::options(argc, argv, opts))
     return 1;
 
-  vector<string> jpegList;
+  vector<string> imgList;
   if( !opts.directory.empty() ) {
-    lsFilesOfType(opts.directory.c_str(),".jpg",jpegList);
+    cout << "getting files from: " << opts.directory << endl;
+    lsFilesOfType(opts.directory.c_str(),".jpg",imgList);
+    if( imgList.empty() ) {
+      lsFilesOfType(opts.directory.c_str(),".png",imgList);
+    }
+    cout << "found # of imgs:" << imgList.size() << endl;
+    for( int k=0; k<(int)imgList.size(); k++ ) {
+      imgList[k] = opts.directory + "/" + imgList[k];
+      cout << "adding image to list: " << imgList[k] << endl;
+    }
   } else {
-    jpegList.push_back(opts.input_img1);
-    jpegList.push_back(opts.input_img2);
+    imgList.push_back(opts.input_img1);
+    imgList.push_back(opts.input_img2);
   }
-
 
   boost::shared_ptr<AffineF2F> RT(new AffineF2F());
-  RT->setup( opts );
 
-  // lock and load
   NLOptCore opt_core(RT);
 
-  // launch the nukes
-  opt_core.optimize();
+  for( int k=1; k<(int)imgList.size(); k++ )
+  {
+    string img1 = imgList[k-1];
+    string img2 = imgList[k];
+    opts.input_img1 = img1;
+    opts.input_img2 = img2;
 
-  // evaluate body count
+    // lock and load
+    RT->setup( opts );
 
-  vector<double> optimal_vxvy = opt_core.getOptimalVector();
-  if( RT->input_opts.verbosity >= 1 ) {
-    imwrite(opts.out_warp_img,RT->warped_best);
-    cout << "DONE." << endl;
+    // launch the nukes
+    opt_core.optimize();
+
+    // evaluate body count
+    vector<double> optimal_vxvy = opt_core.getOptimalVector();
+    cout << Mat(optimal_vxvy) << ";" << endl;
+
+    if( RT->input_opts.verbosity >= 1 )
+    {
+      int imgW = RT->input_img1.cols;
+      int imgH = RT->input_img1.rows;
+      double vx= 2*optimal_vxvy[0];
+      double vy= 2*optimal_vxvy[1];
+      Mat outimg = RT->input_img2.clone();
+      Point2f origin( (imgW-1)/2, (imgH-1)/2);
+      circle(outimg, origin,1,Scalar(0,0,255),3,CV_AA);
+      circle(outimg, origin,1,Scalar(0,255,0),2,CV_AA);
+      Point2f vxvy_offset = origin;
+      vxvy_offset.x += vx ;
+      vxvy_offset.y += vy ;
+      circle(outimg, vxvy_offset,1,Scalar(0,0,0),4,CV_AA);
+      circle(outimg, vxvy_offset,1,Scalar(200,0,200),3,CV_AA);
+      circle(outimg, vxvy_offset,1,Scalar(200,0,0),2,CV_AA);
+      line(outimg,origin,vxvy_offset,Scalar(100,200,200,100),2,CV_AA);
+      line(outimg,origin,vxvy_offset,Scalar(0,0,0,100),1,CV_AA);
+      imshow("from previous to current center. any key to continue. ", outimg );
+      char key = 'x';
+      if( RT->input_opts.verbosity > 1) {
+        key = cv::waitKey(0); // verbose = 2, wait until key
+      } else {
+        cv::waitKey(100);       // verbose = 1, show fastly
+      }
+    }
+
   }
-  cout << Mat(optimal_vxvy) << ";" << endl;
   return 0;
 
 }
