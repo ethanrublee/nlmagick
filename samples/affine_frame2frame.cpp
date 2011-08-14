@@ -33,7 +33,7 @@ public:
     po::options_description desc("Allowed options");
     desc.add_options()("help", "Produce help message.")(
           "imageDirectory,d", po::value<string>(&opts.directory)->default_value(""),
-          "directory of jpeg images. overrides input A,B. ")(
+          "directory of jpeg xor png images. overrides input A,B. ")(
           "inputimageA,A", po::value<string>(&opts.input_img1)->default_value(""),
           "first image (in time)")(
           "inputimageB,B", po::value<string>(&opts.input_img2)->default_value(""),
@@ -57,6 +57,13 @@ public:
 
     if (vm.count("help")) {
       cout << desc << "\n";
+      return 1;
+    }
+
+    if( (opts.input_img1.empty() || opts.input_img2.empty()) &&
+         opts.directory.empty() ) {
+      cout << "Error, must either have image0 and image1 OR a directory." << endl;
+      cout << desc << endl;
       return 1;
     }
 
