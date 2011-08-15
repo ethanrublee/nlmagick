@@ -47,7 +47,9 @@ endmacro()
 
 define_module(nlmagick)
 
-add_subdirectory(samples)
+add_subdirectory(chernobylite)
+include_directories(chernobylite/include)
 
+add_subdirectory(samples)
 add_subdirectory(unittest)
 

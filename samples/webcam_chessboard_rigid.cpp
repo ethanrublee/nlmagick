@@ -1,5 +1,9 @@
 #include <nlmagick/nlopt.hpp>
-#include "opencv_helpers.hpp"
+
+
+
+#include <chernobylite/opencv_helpers.hpp>
+using namespace chernobylite;
 
 using namespace cv;
 using namespace std;

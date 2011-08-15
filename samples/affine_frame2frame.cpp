@@ -1,10 +1,14 @@
 
-#include "opencv_helpers.hpp"
+
 #include "nlmagick/nlopt.hpp"
+
+#include <chernobylite/opencv_helpers.hpp>
+using namespace chernobylite;
 
 using namespace cv;
 using namespace std;
 using namespace nlopt;
+
 namespace po = boost::program_options;
 using boost::lexical_cast;
 
